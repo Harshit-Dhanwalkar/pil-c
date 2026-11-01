@@ -1,4 +1,4 @@
-# Physics Illustration in C (pil-c)
+# Physics Illustration library in C (pil-c)
 A small C99 library that simulates 2D mechanical systems and draws them the way
 a textbook does: grey bodies, coil springs, dashpots, hatched ground, hinges,
 dimension lines, italic serif labels with `x_1`-style subscripts and Greek
@@ -10,7 +10,10 @@ interactive window.
   <tr>
     <td align="center"><img src="docs/assets/half.png" width="250"><br><b>Half-Car on Wavy Road</b></td>
     <td align="center"><img src="docs/assets/incline.png" width="250"><br><b>Cylinder & Block on Wedge</b></td>
+  </tr>
+  <tr>
     <td align="center"><img src="docs/assets/atwood.png" width="200"><br><b>Atwood Machine</b></td>
+    <td align="center"><img src="docs/assets/bowl.png" width="250"><br><b>Circle-in-Circle Rolling</b></td>
   </tr>
 </table>
 
@@ -57,23 +60,23 @@ right-drag pans.
 
 int main(void)
 {
-    pil_world *w = pil_world_new();                       /* gravity defaults to (0,-9.81) */
+    pil_world *w = pil_world_new();                       // gravity defaults to (0,-9.81)
 
     pil_add_ground(w, (pil_vec2){-1, 0}, (pil_vec2){1, 0});
-    pil_add_ground(w, (pil_vec2){1, 1.8}, (pil_vec2){-1, 1.8});             /* ceiling: hatching on the other side */
+    pil_add_ground(w, (pil_vec2){1, 1.8}, (pil_vec2){-1, 1.8});    // ceiling: hatching on the other side
     pil_body *m = pil_add_body(w, &(pil_body_desc){
         .shape = pil_rect(0.4, 0.25), .mass = 2.0, .pos = {0, 0.9}, .label = "m" });
-    pil_add_prismatic(w, pil_on(m, 0, 0), pil_at(0, 0), (pil_vec2){0, 1});   /* vertical guide */
+    pil_add_prismatic(w, pil_on(m, 0, 0), pil_at(0, 0), (pil_vec2){0, 1});   // vertical guide
 
     pil_element *k = pil_add_spring(w, pil_at(0, 1.8), pil_on(m, 0, 0.125), 150, 0.6);
     pil_element_set_label(k, "k");
     pil_add_damper(w, pil_at(0.1, 1.8), pil_on(m, 0.1, 0.125), 3.0);
 
-    pil_world_settle(w, 5.0);                             /* optional: start at equilibrium */
+    pil_world_settle(w, 5.0);                             // optional: start at equilibrium
     pil_view v;
     pil_view_fit(&v, -1, -0.1, 1, 2, 600, 600, 20);
     pil_style st = pil_style_textbook();
-    pil_record(w, &v, &st, "out.gif", 4.0, 30.0, 5e-4);   /* or pil_export_png/pdf/svg, or pil_app_run */
+    pil_record(w, &v, &st, "out.gif", 4.0, 30.0, 5e-4);   // or pil_export_png/pdf/svg, or pil_app_run
     pil_world_free(w);
 }
 ```
@@ -82,7 +85,7 @@ int main(void)
 
 * **Bodies** have a shape (`pil_rect`, `pil_disc`, `pil_point_mass`, `pil_poly`,
   `pil_arc_band`), mass, inertia (computed from the shape if you give 0), a state,
-  and flags (`pil_STATIC`, `pil_SPOKE`, `pil_HIDDEN`, ...).  `pos` is the centre of mass.
+  and flags (`PIL_STATIC`, `PIL_SPOKE`, `PIL_HIDDEN`, ...).  `pos` is the centre of mass.
   For polygons and arc bands the shape is re-centred on its centroid automatically.
 * **Anchors** say *where* an element attaches: `pil_on(body, lx, ly)` is a point fixed
   in a body, `pil_at(x, y)` is a point fixed in the world.  Every element takes anchors.
@@ -96,7 +99,7 @@ int main(void)
 | constant force / "pull" | `pil_add_force` |
 | any force law you like | `pil_add_custom_force(fn)` - call `pil_apply_force` inside |
 | pin / hinge | `pil_add_revolute` |
-| rigid rod / rope | `pil_add_distance(..., 0)` / `(..., pil_ROPE)` |
+| rigid rod / rope | `pil_add_distance(..., 0)` / `(..., PIL_ROPE)` |
 | rope over a pulley | `pil_add_pulley_rope` (+ a static disc body for the pulley) |
 | sliding guide, rail | `pil_add_slot`, `pil_add_prismatic` (slot + fixed angle) |
 | lock an angle / motor | `pil_add_fixed_angle`, `pil_add_rotation_drive` |

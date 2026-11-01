@@ -4,7 +4,7 @@
  */
 
 /*
- * pil_core.h - physics core: 2D rigid bodies, force elements,constraints and a
+ * pil_core.h - physics core: 2D rigid bodies, force elements, constraints and a
  * DAE integrator
  *
  * Conventions: SI units, y axis up, angles in radians (counter-clockwise
@@ -17,17 +17,20 @@
  *   pil_body *m = pil_add_body(w, &(pil_body_desc){
  *        .shape = pil_rect(0.6, 0.3), .mass = 2.0, .pos = {0, 1}, .label = "m"
  * }); pil_add_spring(w, pil_at(0, 2), pil_on(m, 0, 0.15), 50.0,
- * pil_REST_INITIAL); pil_world_advance(w, 1.0, 1e-3);
+ * PIL_REST_INITIAL); pil_world_advance(w, 1.0, 1e-3);
  */
-#ifndef pil_CORE_H
-#define pil_CORE_H
+
+#ifndef PIL_CORE_H
+#define PIL_CORE_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Forward declarations so core never needs <cairo.h> */
-typedef struct _cairo cairo_t;
+/* Forward declarations so core never needs <cairo.h>
+ * (`struct _cairo` is type cairo calls cairo_t, so overlay callbacks can be
+ * written with usual `cairo_t *`) */
+struct _cairo;
 typedef struct pil_view pil_view;
 
 typedef struct pil_world pil_world;
@@ -45,11 +48,11 @@ static inline pil_vec2 pil_v2(double x, double y) {
 
 /* Shapes */
 typedef enum {
-  pil_SHAPE_POINT = 0, /* point mass, drawn as a filled dot of radius r   */
-  pil_SHAPE_RECT,      /* w x h centred on shape origin               */
-  pil_SHAPE_DISC,      /* radius r                                        */
-  pil_SHAPE_POLY,      /* convex or concave polygon, local coordinates    */
-  pil_SHAPE_ARC_BAND   /* annular sector r_in..r_out, angles a0..a1       */
+  PIL_SHAPE_POINT = 0, /* point mass, drawn as a filled dot of radius r   */
+  PIL_SHAPE_RECT,      /* w x h centred on shape origin               */
+  PIL_SHAPE_DISC,      /* radius r                                        */
+  PIL_SHAPE_POLY,      /* convex or concave polygon, local coordinates    */
+  PIL_SHAPE_ARC_BAND   /* annular sector r_in..r_out, angles a0..a1       */
 } pil_shape_kind;
 
 typedef struct {
@@ -73,11 +76,11 @@ pil_shape pil_arc_band(double r_in, double r_out, double a0, double a1);
 
 /* Bodies */
 enum {
-  pil_STATIC = 1 << 0,   /* infinite mass, does not move                 */
-  pil_HIDE_COM = 1 << 1, /* do not draw centre-of-mass symbol        */
-  pil_SPOKE = 1 << 2,    /* draw a radial tick on discs (shows rotation) */
-  pil_HIDDEN = 1 << 3,   /* do not draw body at all                  */
-  pil_NO_FILL = 1 << 4   /* outline only                                 */
+  PIL_STATIC = 1 << 0,   /* infinite mass, does not move                 */
+  PIL_HIDE_COM = 1 << 1, /* do not draw centre-of-mass symbol        */
+  PIL_SPOKE = 1 << 2,    /* draw a radial tick on discs (shows rotation) */
+  PIL_HIDDEN = 1 << 3,   /* do not draw body at all                  */
+  PIL_NO_FILL = 1 << 4   /* outline only                                 */
 };
 
 typedef struct {
@@ -97,20 +100,24 @@ typedef struct {
 typedef struct pil_body {
   int id;
   pil_shape shape;
-  double mass, inertia, inv_mass, inv_inertia;
+  double mass;
+  double inertia;
+  double inv_mass;
+  double inv_inertia;
   unsigned flags;
   pil_vec2 pos;
   double angle;
   pil_vec2 vel;
   double omega;
   pil_vec2 acc;
-  double alpha; /* from last solve                    */
+  double alpha; /* from last solve                         */
   pil_vec2 force;
   double torque; /* accumulators, valid inside force fns   */
   double fill;
   char label[32];
-  double label_dx, label_dy;
-  int dof; /* internal: -1 for static bodies         */
+  double label_dx;
+  double label_dy;
+  int dof; /* internal: -1 for static bodies           */
   pil_vec2 pos0;
   double angle0;
   pil_vec2 vel0;
@@ -169,7 +176,7 @@ void pil_world_reset(pil_world *w);
 
 double pil_world_energy(const pil_world *w); /* kinetic + gravity + springs */
 double
-pil_world_constraint_error(const pil_world *w); /* max |Phi| over all rows */
+pil_world_constraint_error(const pil_world *w); /* max |\Phi| over all rows */
 
 int pil_world_body_count(const pil_world *w);
 pil_body *pil_world_body(pil_world *w, int index);
@@ -182,11 +189,11 @@ void pil_world_set_grab(pil_world *w, pil_body *b, pil_vec2 local,
 void pil_world_clear_grab(pil_world *w);
 
 /* Elements (everything can be "drop in") */
-#define pil_REST_INITIAL (-1.0) /* spring rest length = distance at creation   \
-                                 */
-#define pil_LENGTH_INITIAL                                                     \
-  (-1.0)               /* distance constraint length = initial distance */
-enum { pil_ROPE = 1 }; /* distance constraint: only resists stretching */
+#define PIL_REST_INITIAL                                                       \
+  (-1.0) /* spring rest length = distance at creation                          \
+          */
+#define PIL_LENGTH_INITIAL (-1.0)
+enum { PIL_ROPE = 1 }; /* distance constraint: only resists stretching */
 
 /* Force elements */
 pil_element *pil_add_spring(pil_world *w, pil_anchor a, pil_anchor b, double k,
@@ -239,7 +246,20 @@ pil_element *pil_add_rotation_drive(pil_world *w, pil_body *a, double omega);
 pil_element *pil_add_rolling(pil_world *w, pil_body *b, pil_vec2 center_local,
                              double radius, pil_vec2 line_point,
                              pil_vec2 line_dir);
-/* Unilateral contact (penalty + regularised Coulomb friction) between
+/* A circle (centre anchor `a`, radius ra, fixed on rolling body) rolls without
+ * slipping on a circle (centre anchor `b`, radius rb, fixed on track body or
+ * world)
+ * inside != 0: rolling circle runs on concave side (a ball in a bowl; pass
+ * bowl's INNER radius and, for an arc band, shape origin as `b`)
+ * inside == 0: it runs on convex side (a wheel on a cylinder)
+ * Both bodies may move
+ * Contact is bilateral: ball cannot leave surface */
+pil_element *pil_add_circle_rolling(pil_world *w, pil_anchor a, double ra,
+                                    pil_anchor b, double rb, int inside);
+/* Rigidly join two bodies at a point (pin + fixed relative angle)
+ * Returns pin */
+pil_element *pil_add_weld(pil_world *w, pil_anchor a, pil_anchor b);
+/* Unilateral contact (penalty + regularised Coulomb friction) between the
  * corners / rim of `body` and a line attached to `surface` (NULL = world),
  * given by a point and direction in surface frame
  * Body must be on left of direction
@@ -279,6 +299,15 @@ pil_deco *pil_add_dimension(pil_world *w, pil_anchor a, pil_anchor b,
 pil_deco *pil_add_arrow(pil_world *w, pil_anchor from, double dx_px,
                         double dy_px, const char *text);
 pil_deco *pil_add_line(pil_world *w, pil_anchor a, pil_anchor b, int dash_dot);
+/* Leader line with arrowhead touching `at`; label sits at far end
+ * (dx,dy pixels from `at`, dy up) - "M" pointer of textbook figures */
+pil_deco *pil_add_leader(pil_world *w, pil_anchor at, double dx_px,
+                         double dy_px, const char *text);
+/* Angle arc at `center` from direction of p1 to direction of p2 (shorter way)
+ * All three are anchors, so it follows moving bodies and scales with zoom */
+pil_deco *pil_add_angle_between(pil_world *w, pil_anchor center, pil_anchor p1,
+                                pil_anchor p2, double radius_px,
+                                const char *text);
 /* Hatched ground / wall: hatching is drawn on right of direction a->b */
 pil_deco *pil_add_ground(pil_world *w, pil_vec2 a, pil_vec2 b);
 /* Small "g" arrow in corner of textbook figures */
@@ -290,7 +319,8 @@ pil_deco *pil_add_angle_marker(pil_world *w, pil_anchor center,
 void pil_deco_hide(pil_deco *d);
 
 /* Draw anything you like on top (called with view used for frame) */
-typedef void (*pil_overlay_fn)(cairo_t *cr, const pil_view *view, void *user);
+typedef void (*pil_overlay_fn)(struct _cairo *cr, const pil_view *view,
+                               void *user);
 void pil_world_add_overlay(pil_world *w, pil_overlay_fn fn, void *user);
 
 #ifdef __cplusplus

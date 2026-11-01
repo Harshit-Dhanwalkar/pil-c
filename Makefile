@@ -1,6 +1,6 @@
-# pil - Textbook Physics Illustration Library
+# pil-c - Textbook Physics Illustration Library in C
 # core (libm only) + Cairo renderer, optional SDL2 window
-# make [test] [install PREFIX=/usr/local] [clean]
+# make [test] [check] [install PREFIX=/usr/local] [clean]
 
 CC      ?= cc
 CFLAGS  ?= -O2 -g
@@ -13,7 +13,7 @@ SRCS    := src/world.c src/elements.c src/solver.c src/draw.c
 
 HAVE_SDL := $(shell pkg-config --exists sdl2 && echo 1)
 ifeq ($(HAVE_SDL),1)
-  override CFLAGS += -Dpil_HAVE_SDL $(shell pkg-config --cflags sdl2)
+  override CFLAGS += -DPIL_HAVE_SDL $(shell pkg-config --cflags sdl2)
   override LIBS := $(shell pkg-config --libs sdl2) $(LIBS)
   SRCS   += src/app_sdl.c
 endif
@@ -51,4 +51,8 @@ install: $(BUILD)/libpil.a
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all test install clean
+# run each example's built-in sanity check (energy / constraint drift, no NaN)
+check: $(EXAMPLES)
+	@for e in $(EXAMPLES); do echo "== $$e"; $$e --check 5 || exit 1; done
+
+.PHONY: all test check install clean

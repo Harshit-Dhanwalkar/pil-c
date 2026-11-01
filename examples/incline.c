@@ -5,17 +5,19 @@
  * Right slope: a block with Coulomb friction on same kind of spring
  * Everything is public-API
  */
+
 #include "example_main.h"
 #include <math.h>
 
 int main(int argc, char **argv) {
-  const double base = 3.2, rise = 1.0;
+  const double base = 3.2;
+  const double rise = 1.0;
   const pil_vec2 apex = {base / 2, rise};
   const double al = atan2(rise, base / 2);
-  const pil_vec2 ul = {cos(al), sin(al)},
-                 nl = {-sin(al), cos(al)}; /* left slope: up-hill, normal */
-  const pil_vec2 ur = {cos(al), -sin(al)},
-                 nr = {sin(al), cos(al)}; /* right slope: down-hill, normal */
+  const pil_vec2 ul = {cos(al), sin(al)};  // left slope: up-hill
+  const pil_vec2 nl = {-sin(al), cos(al)}; // left slope: normal
+  const pil_vec2 ur = {cos(al), -sin(al)}; // right slope: down-hill
+  const pil_vec2 nr = {sin(al), cos(al)};  // right slope: normal
 
   pil_world *w = pil_world_new();
 
@@ -24,11 +26,11 @@ int main(int argc, char **argv) {
   pil_add_body(w, &(pil_body_desc){.shape = pil_poly(tri, 3),
                                    .mass = 1,
                                    .pos = {base / 2, rise / 3},
-                                   .flags = pil_STATIC | pil_HIDE_COM});
+                                   .flags = PIL_STATIC | PIL_HIDE_COM});
   pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.24, 0.5),
                                    .mass = 1,
                                    .pos = {apex.x, apex.y + 0.05},
-                                   .flags = pil_STATIC | pil_HIDE_COM});
+                                   .flags = PIL_STATIC | PIL_HIDE_COM});
   pil_add_ground(w, (pil_vec2){-0.5, 0}, (pil_vec2){base + 0.5, 0});
 
   // left: cylinder rolling on slope, spring to post
@@ -38,7 +40,7 @@ int main(int argc, char **argv) {
   pil_body *cyl = pil_add_body(w, &(pil_body_desc){.shape = pil_disc(r),
                                                    .mass = 3.0,
                                                    .pos = cpos,
-                                                   .flags = pil_SPOKE,
+                                                   .flags = PIL_SPOKE,
                                                    .label = "M",
                                                    .label_dx = -18,
                                                    .label_dy = 18});

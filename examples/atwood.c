@@ -1,6 +1,7 @@
 /*
  * atwood.c - two masses over a pulley, with force arrows and a floor stop
  */
+
 #include "example_main.h"
 #include <math.h>
 
@@ -11,20 +12,22 @@ static void pulley_pin(cairo_t *cr, const pil_view *v, void *user) {
 }
 
 int main(int argc, char **argv) {
-  const double R = 0.2, yc = 2.0, h = 0.28;
+  const double R = 0.2;
+  const double yc = 2.0;
+  const double h = 0.28;
   static pil_vec2 centre = {0.0, 2.0};
   pil_world *w = pil_world_new();
 
-  /* ceiling, hanger and pulley */
+  // ceiling, hanger and pulley
   pil_add_ground(w, (pil_vec2){0.9, yc + 0.7}, (pil_vec2){-0.9, yc + 0.7});
   pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.05, 0.7),
                                    .mass = 1,
                                    .pos = {0, yc + 0.35},
-                                   .flags = pil_STATIC | pil_HIDE_COM});
+                                   .flags = PIL_STATIC | PIL_HIDE_COM});
   pil_add_body(w, &(pil_body_desc){.shape = pil_disc(R),
                                    .mass = 1,
                                    .pos = centre,
-                                   .flags = pil_STATIC | pil_HIDE_COM});
+                                   .flags = PIL_STATIC | PIL_HIDE_COM});
   pil_world_add_overlay(w, pulley_pin, &centre);
   pil_add_ground(w, (pil_vec2){-0.9, 0}, (pil_vec2){0.9, 0});
 
@@ -47,7 +50,7 @@ int main(int argc, char **argv) {
   pil_add_floor_contact(w, B, pil_at(0, 0), (pil_vec2){1, 0}, 2e5, 2e3, 0.0);
   pil_add_pulley_rope(w, pil_on(A, 0, h / 2), pil_on(B, 0, h / 2),
                       (pil_vec2){-R, yc}, (pil_vec2){+R, yc},
-                      pil_LENGTH_INITIAL);
+                      PIL_LENGTH_INITIAL);
 
   // free-body style arrows
   pil_add_arrow(w, pil_on(A, 0, -h / 2), 0, -46, "m_1g");

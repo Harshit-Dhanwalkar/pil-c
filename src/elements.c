@@ -22,7 +22,7 @@
     }                                                                          \
   } while (0)
 
-/* anchors */
+// Anchors
 pil_vec2 pil_anchor_world(pil_anchor a) {
   return a.body ? v_add(a.body->pos, v_rot(a.local, a.body->angle)) : a.local;
 }
@@ -42,7 +42,7 @@ pil_vec2 pil_anchor_vel(pil_anchor a) {
 
 static double a_omega(pil_anchor a) { return a.body ? a.body->omega : 0.0; }
 
-/* creation */
+// Creation
 static pil_element *new_el(pil_world *w, pil_el_kind k) {
   pil_element *e = calloc(1, sizeof *e);
   if (!e) {
@@ -144,7 +144,7 @@ static pil_vec2 unit(pil_vec2 d) {
 
 int pil_is_rope(const pil_element *e) {
   return e->kind == EL_PULLEY ||
-         (e->kind == EL_DISTANCE && (e->flags & pil_ROPE));
+         (e->kind == EL_DISTANCE && (e->flags & PIL_ROPE));
 }
 
 double pil_rope_length(const pil_element *e) {
@@ -224,9 +224,38 @@ pil_element *pil_add_rolling(pil_world *w, pil_body *b, pil_vec2 center_local,
   e->b = pil_at(line_point.x, line_point.y);
   e->dir = unit(line_dir);
   e->hidden = 1;
+
   pil_elements_rebase(w);
 
   return e;
+}
+
+pil_element *pil_add_circle_rolling(pil_world *w, pil_anchor a, double ra,
+                                    pil_anchor b, double rb, int inside) {
+  pil_element *e = new_el(w, EL_CIRCLE_ROLL);
+  e->a = a;
+  e->b = b;
+  e->radius = ra;
+  e->radius2 = rb;
+  e->sigma = inside ? -1 : +1;
+  e->hidden = 1;
+
+  pil_elements_rebase(w);
+
+  return e;
+}
+
+pil_element *pil_add_weld(pil_world *w, pil_anchor a, pil_anchor b) {
+  pil_element *pin = pil_add_revolute(w, a, b);
+  double ta = a.body ? a.body->angle : 0, tb = b.body ? b.body->angle : 0;
+  if (a.body) {
+    pil_add_fixed_angle(w, a.body, b.body, ta - tb)->hidden = 1;
+  } else if (b.body) {
+    pil_add_fixed_angle(w, b.body, a.body, tb - ta)->hidden = 1;
+  }
+  pin->hidden = 1;
+
+  return pin;
 }
 
 pil_element *pil_add_floor_contact(pil_world *w, pil_body *body,
@@ -304,6 +333,14 @@ void pil_elements_rebase(pil_world *w) {
     pil_element *e = w->els[i];
     if (e->kind == EL_ROT_DRIVE) {
       e->phase = e->a.body->angle - e->omega * w->t;
+    } else if (e->kind == EL_CIRCLE_ROLL) {
+      pil_vec2 d = v_sub(pil_anchor_world(e->a), pil_anchor_world(e->b));
+      double thb = e->b.body ? e->b.body->angle : 0;
+      double thr = e->a.body ? e->a.body->angle : 0;
+      pil_vec2 dl = v_rot(d, -thb);
+      double D = e->radius2 + e->sigma * e->radius;
+      e->ref = atan2(dl.y, dl.x);
+      e->phase = D * e->ref + e->sigma * e->radius * (thb - thr);
     } else if (e->kind == EL_ROLLING) {
       pil_body *b = e->a.body;
       pil_vec2 C = pil_anchor_world(e->a);
@@ -318,11 +355,11 @@ static int contact_points(const pil_body *b, pil_vec2 n, pil_vec2 *pts) {
   pil_vec2 c0 = v_add(b->pos, v_rot(s->offset, b->angle));
   int np = 0;
   switch (s->kind) {
-  case pil_SHAPE_POINT:
-  case pil_SHAPE_DISC:
+  case PIL_SHAPE_POINT:
+  case PIL_SHAPE_DISC:
     pts[np++] = v_sub(c0, v_mul(n, s->r));
     break;
-  case pil_SHAPE_RECT: {
+  case PIL_SHAPE_RECT: {
     for (int i = 0; i < 4; i++) {
       pil_vec2 q =
           pil_v2((i & 1 ? 0.5 : -0.5) * s->w, (i & 2 ? 0.5 : -0.5) * s->h);
@@ -330,7 +367,7 @@ static int contact_points(const pil_body *b, pil_vec2 n, pil_vec2 *pts) {
     }
     break;
   }
-  case pil_SHAPE_POLY:
+  case PIL_SHAPE_POLY:
     for (int i = 0; i < s->npts && np < 64; i++) {
       pts[np++] = v_add(c0, v_rot(s->pts[i], b->angle));
     }
@@ -338,6 +375,7 @@ static int contact_points(const pil_body *b, pil_vec2 n, pil_vec2 *pts) {
   default:
     break;
   }
+
   return np;
 }
 
@@ -348,6 +386,7 @@ static double floor_eval(const pil_element *e, int apply) {
   pil_vec2 u = v_rot(e->dir, L.body ? L.body->angle : 0.0);
   pil_vec2 n = v_perp(u);
   pil_vec2 pts[64];
+
   int np = contact_points(bd, n, pts);
   double energy = 0;
   double vs = 1e-2;
@@ -385,6 +424,7 @@ static double floor_eval(const pil_element *e, int apply) {
       pil_apply_force(L.body, pts[i], v_mul(F, -1.0));
     }
   }
+
   return energy;
 }
 
@@ -527,7 +567,7 @@ int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
   }
 
   case EL_DISTANCE: {
-    if ((e->flags & pil_ROPE) && e->rope_off && !force_active) {
+    if ((e->flags & PIL_ROPE) && e->rope_off && !force_active) {
       return 0;
     }
 
@@ -553,6 +593,64 @@ int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
     return 1;
   }
 
+  case EL_CIRCLE_ROLL: {
+    pil_vec2 rr = pil_anchor_r(e->a);
+    pil_vec2 rb = pil_anchor_r(e->b);
+    pil_vec2 d = v_sub(pil_anchor_world(e->a), pil_anchor_world(e->b));
+    pil_vec2 dd = v_sub(pil_anchor_vel(e->a), pil_anchor_vel(e->b));
+    double wr = a_omega(e->a);
+    double wb = a_omega(e->b);
+    double thr = e->a.body ? e->a.body->angle : 0;
+    double thb = e->b.body ? e->b.body->angle : 0;
+    double sg = e->sigma, r = e->radius, R = e->radius2, D = R + sg * r;
+    double L2 = v_dot(d, d);
+    if (L2 < 1e-18) {
+      L2 = 1e-18;
+    }
+    double L = sqrt(L2);
+    pil_vec2 n = v_mul(d, 1.0 / L);
+    // row 0: centre distance  |C - O| = R + \sigma r
+    double ndd = v_dot(n, dd);
+    rows[0].phi = L - D;
+    rows[0].vel = ndd;
+    rows[0].ja[0] = n.x;
+    rows[0].ja[1] = n.y;
+    rows[0].ja[2] = v_cross(rr, n);
+    rows[0].jb[0] = -n.x;
+    rows[0].jb[1] = -n.y;
+    rows[0].jb[2] = -v_cross(rb, n);
+    finish(e, &rows[0],
+           v_dot(n, v_sub(v_mul(rr, wr * wr), v_mul(rb, wb * wb))) -
+               (v_dot(dd, dd) - ndd * ndd) / L);
+    // row 1: no slip.  Phi = D*psi_rel + sigma*r*(th_b - th_r) - c, psi_rel =
+    // angle of d in track frame, unwrapped about reference angle (ball never
+    // travels more than pi around track)
+    pil_vec2 dl = v_rot(d, -thb);
+    double raw = atan2(dl.y, dl.x) - e->ref;
+    while (raw > 3.14159265358979323846) {
+      raw -= 6.28318530717958647692;
+    }
+    while (raw < -3.14159265358979323846) {
+      raw += 6.28318530717958647692;
+    }
+    double psi_rel = e->ref + raw;
+    double psid = v_cross(d, dd) / L2;
+    pil_vec2 g = v_mul(v_perp(d), D / L2);
+    rows[1].phi = D * psi_rel + sg * r * (thb - thr) - e->phase;
+    rows[1].vel = D * psid - sg * r * wr - R * wb;
+    rows[1].ja[0] = g.x;
+    rows[1].ja[1] = g.y;
+    rows[1].ja[2] = v_cross(rr, g) - sg * r;
+    rows[1].jb[0] = -g.x;
+    rows[1].jb[1] = -g.y;
+    rows[1].jb[2] = -v_cross(rb, g) - R;
+    finish(e, &rows[1],
+           D * (wr * wr * v_cross(d, rr) / L2 - wb * wb * v_cross(d, rb) / L2 +
+                2.0 * psid * v_dot(d, dd) / L2));
+
+    return 2;
+  }
+
   case EL_PULLEY: {
     if (e->rope_off && !force_active) {
       return 0;
@@ -561,7 +659,7 @@ int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
     pil_vec2 ra = pil_anchor_r(e->a);
     pil_vec2 rb = pil_anchor_r(e->b);
     pil_vec2 da = v_sub(pil_anchor_world(e->a), e->p1);
-    pil_vec2 db = v_sub(pil_anchor_world(e->b), e->p2); 
+    pil_vec2 db = v_sub(pil_anchor_world(e->b), e->p2);
     pil_vec2 va = pil_anchor_vel(e->a);
     pil_vec2 vb = pil_anchor_vel(e->b);
     double la = sqrt(v_dot(da, da));

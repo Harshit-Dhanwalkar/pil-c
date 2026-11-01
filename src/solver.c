@@ -84,10 +84,10 @@ static inline double couple(const pil_body *b, const double *j1,
          j1[2] * j2[2] * b->inv_inertia;
 }
 
-static int build_rows(struct pil_world *w) {
+static int build_rows(pil_world *w) {
   int m = 0;
   for (int i = 0; i < w->nels; i++) {
-    struct pil_element *e = w->els[i];
+    pil_element *e = w->els[i];
     if (!pil_is_constraint(e)) {
       continue;
     }
@@ -112,29 +112,21 @@ static int build_rows(struct pil_world *w) {
   return m;
 }
 
-static void solve_lambda(struct pil_world *w, int m) {
+/* K = J M^-1 J^T for rows in w->rows (stored at w->K; m right-hand-side slots
+ * follow it) */
+static void build_K(pil_world *w, int m) {
+  if (m <= 0) {
+    return;
+  }
+
   int need = m * m + m;
   GROW(w->K, need, w->kcap);
-  double *K = w->K, *rhs = w->K + (size_t)m * m;
+  double *K = w->K;
   for (int i = 0; i < m; i++) {
     const pil_rowrec *ri = &w->rows[i];
     pil_body *ai = ri->el->a.body;
     pil_body *bi = ri->el->b.body;
 
-    // rhs = J M^-1 F - \gamma
-    double s = -ri->r.gamma;
-    if (pil_isdyn(ai)) {
-      s += (ri->r.ja[0] * ai->force.x + ri->r.ja[1] * ai->force.y) *
-               ai->inv_mass +
-           ri->r.ja[2] * ai->torque * ai->inv_inertia;
-    }
-    if (pil_isdyn(bi)) {
-      s += (ri->r.jb[0] * bi->force.x + ri->r.jb[1] * bi->force.y) *
-               bi->inv_mass +
-           ri->r.jb[2] * bi->torque * bi->inv_inertia;
-    }
-
-    rhs[i] = s;
     for (int j = 0; j < m; j++) {
       const pil_rowrec *rj = &w->rows[j];
       pil_body *aj = rj->el->a.body;
@@ -159,12 +151,140 @@ static void solve_lambda(struct pil_world *w, int m) {
     K[i * m + i] +=
         1e-10 * (1.0 + K[i * m + i]); // tolerate redundant constraints
   }
+}
+
+static void solve_lambda(pil_world *w, int m) {
+  if (m <= 0) {
+    return;
+  }
+
+  build_K(w, m);
+  double *K = w->K;
+  double *rhs = w->K + (size_t)m * m;
+  for (int i = 0; i < m; i++) {
+    const pil_rowrec *ri = &w->rows[i];
+    pil_body *ai = ri->el->a.body, *bi = ri->el->b.body;
+    // rhs = J M^-1 F - \gamma
+    double s = -ri->r.gamma;
+    if (pil_isdyn(ai)) {
+      s += (ri->r.ja[0] * ai->force.x + ri->r.ja[1] * ai->force.y) *
+               ai->inv_mass +
+           ri->r.ja[2] * ai->torque * ai->inv_inertia;
+    }
+    if (pil_isdyn(bi)) {
+      s += (ri->r.jb[0] * bi->force.x + ri->r.jb[1] * bi->force.y) *
+               bi->inv_mass +
+           ri->r.jb[2] * bi->torque * bi->inv_inertia;
+    }
+
+    rhs[i] = s;
+  }
 
   if (!solve_dense(K, rhs, m)) {
     memset(rhs, 0, (size_t)m * sizeof(double));
   }
   for (int i = 0; i < m; i++) {
     w->rows[i].lambda = rhs[i];
+  }
+}
+
+// A rope that goes taut while its ends are still moving apart must stop that
+// motion at once (an inelastic impulse), otherwise a stabilised constraint lets
+// it stretch before arresting. We solve for impulses that zero extension rate
+// of snapped ropes and leave every other constraint's velocity untouched, then
+// apply them to body velocities
+void pil_project_rope_snaps(pil_world *w) {
+  const double vtol = 1e-4;
+  int any = 0;
+  for (int i = 0; i < w->nels && !any; i++) {
+    pil_element *e = w->els[i];
+    if (!pil_is_rope(e)) {
+      continue;
+    }
+    if (!pil_isdyn(e->a.body) && !pil_isdyn(e->b.body)) {
+      continue;
+    }
+
+    pil_row r[2];
+    if (pil_constraint_eval(e, w->tcur, r, 1) > 0 &&
+        r[0].phi > -1e-3 * e->length && r[0].vel > vtol) {
+      any = 1;
+    }
+  }
+
+  if (!any) {
+    return;
+  }
+
+  int m = 0;
+  for (int i = 0; i < w->nels; i++) {
+    pil_element *e = w->els[i];
+    if (!pil_is_constraint(e)) {
+      continue;
+    }
+    if (!pil_isdyn(e->a.body) && !pil_isdyn(e->b.body)) {
+      continue;
+    }
+
+    pil_row r[2];
+    int n = pil_constraint_eval(e, w->tcur, r, 1);
+    for (int k = 0; k < n; k++) {
+      double target = 0;
+      if (pil_is_rope(e)) {
+        if (!(r[k].phi > -1e-3 * e->length && r[k].vel > vtol)) {
+          continue; // slack or not extending: leave alone
+        }
+
+        target = r[k].vel;
+      }
+
+      GROW(w->rows, m + 1, w->rowcap);
+      w->rows[m].el = e;
+      w->rows[m].idx = k;
+      w->rows[m].r = r[k];
+      w->rows[m].lambda = 0;
+      w->rows[m].target = target;
+      m++;
+    }
+  }
+
+  for (int it = 0; it < 4; it++) {
+    build_K(w, m);
+    double *K = w->K, *rhs = w->K + (size_t)m * m;
+    for (int i = 0; i < m; i++) {
+      rhs[i] = w->rows[i].target;
+    }
+    if (!solve_dense(K, rhs, m)) {
+      return;
+    }
+
+    int changed = 0;
+    for (int i = 0; i < m; i++) {
+      w->rows[i].lambda = rhs[i];
+      if (pil_is_rope(w->rows[i].el) && w->rows[i].target != 0 && rhs[i] < 0) {
+        w->rows[i].target = 0;
+        changed = 1;
+      } // a rope cannot push
+    }
+
+    if (!changed) {
+      break;
+    }
+  }
+
+  for (int i = 0; i < m; i++) {
+    const pil_rowrec *r = &w->rows[i];
+    pil_body *a = r->el->a.body, *b = r->el->b.body;
+    if (pil_isdyn(a)) {
+      a->vel.x -= r->r.ja[0] * r->lambda * a->inv_mass;
+      a->vel.y -= r->r.ja[1] * r->lambda * a->inv_mass;
+      a->omega -= r->r.ja[2] * r->lambda * a->inv_inertia;
+    }
+    if (pil_isdyn(b)) {
+      b->vel.x -= r->r.jb[0] * r->lambda * b->inv_mass;
+      b->vel.y -= r->r.jb[1] * r->lambda * b->inv_mass;
+      b->omega -= r->r.jb[2] * r->lambda * b->inv_inertia;
+    }
   }
 }
 
@@ -181,6 +301,7 @@ void pil_compute_accel(pil_world *w) {
         v_add(v_mul(w->g, b->mass), v_mul(b->vel, -w->drag_lin * b->mass));
     b->torque = -w->drag_ang * b->inertia * b->omega;
   }
+
   for (int i = 0; i < w->nels; i++) {
     if (!pil_is_constraint(w->els[i])) {
       pil_element_apply(w->els[i], w, w->tcur);
@@ -209,6 +330,7 @@ void pil_compute_accel(pil_world *w) {
     if (!pil_is_rope(e)) {
       continue;
     }
+
     // RK4 stages can undershoot by ~1e-6; real slackness is caught by \lambda
     // test below
     e->rope_off = pil_rope_length(e) < e->length * (1.0 - 1e-3);
@@ -221,6 +343,7 @@ void pil_compute_accel(pil_world *w) {
     if (m == 0) {
       break;
     }
+
     solve_lambda(w, m);
     int changed = 0;
     for (int i = 0; i < m; i++) {

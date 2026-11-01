@@ -4,6 +4,7 @@
  *
  *   ./halfcar [frame.png] | --record out.gif [seconds] | --live
  */
+
 #include "example_main.h"
 #include <math.h>
 
@@ -16,8 +17,8 @@ static double road(double s, void *user) {
          0.012 * sin(2 * M_PI * s / 0.65 + 1.0);
 }
 
-/* Anything library does not provide can be drawn in an overlay:
- * here dash-dot axis through COM, its pin, and v_0 arrow */
+// Anything library does not provide can be drawn in an overlay:
+// here dash-dot axis through COM, its pin, and v_0 arrow
 static void body_axis_overlay(cairo_t *cr, const pil_view *v, void *user) {
   const pil_body *M = user;
   pil_style st = pil_style_textbook();
@@ -39,13 +40,20 @@ static void body_axis_overlay(cairo_t *cr, const pil_view *v, void *user) {
 }
 
 int main(int argc, char **argv) {
-  const double b = 2.4, a = 0.36, l = 0.9, r = 0.2; /* geometry [m] */
-  const double v0 = 5.0;                            /* speed [m/s]  */
-  const double kt = 2.2e5, ct = 400;                /* tyre         */
+  // geometry [m]
+  const double b = 2.4;
+  const double a = 0.36;
+  const double l = 0.9;
+  const double r = 0.2;
+  // speed [m/s]
+  const double v0 = 5.0;
+  // tyre
+  const double kt = 2.2e5;
+  const double ct = 400;
 
   pil_world *w = pil_world_new();
   pil_terrain *ground =
-      pil_add_terrain(w, road, NULL, v0); /* road scrolls under car */
+      pil_add_terrain(w, road, NULL, v0); // road scrolls under car
 
   // sprung mass M: free to heave and pitch (slot on a vertical line through
   // COM)
@@ -61,33 +69,36 @@ int main(int argc, char **argv) {
 
   // two axles; each = hidden non-rotating carrier (spring/damper end) +
   // spinning wheel
-  const double xs[2] = {-l, l}, mw[2] = {40, 45};
-  const double ks[2] = {32000, 38000}, ds[2] = {2400, 2800};
-  const char *wl[2] = {"m_1", "m_2"}, *kl[2] = {"k_1", "k_2"},
-             *dl[2] = {"d_1", "d_2"};
+  const double xs[2] = {-l, l};
+  const double mw[2] = {40, 45};
+  const double ks[2] = {32000, 38000};
+  const double ds[2] = {2400, 2800};
+  const char *wl[2] = {"m_1", "m_2"};
+  const double *kl[2] = {"k_1", "k_2"};
+  const double *dl[2] = {"d_1", "d_2"};
   for (int i = 0; i < 2; i++) {
     pil_vec2 p = {xs[i], r + road(xs[i], NULL)};
     pil_body *car =
         pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.01),
                                          .mass = 0.5,
                                          .pos = p,
-                                         .flags = pil_HIDDEN});
+                                         .flags = PIL_HIDDEN});
     pil_body *wh =
         pil_add_body(w, &(pil_body_desc){.shape = pil_disc(r),
                                          .mass = mw[i],
                                          .pos = p,
-                                         .flags = pil_SPOKE | pil_HIDE_COM,
+                                         .flags = PIL_SPOKE | PIL_HIDE_COM,
                                          .label = wl[i],
                                          .label_dx = 0,
                                          .label_dy = -(r * PX_PER_M + 20)});
     pil_add_prismatic(w, pil_on(car, 0, 0), pil_at(xs[i], 0), (pil_vec2){0, 1});
     pil_element_hide(pil_add_revolute(w, pil_on(car, 0, 0), pil_on(wh, 0, 0)));
-    pil_add_rotation_drive(w, wh, -v0 / r); /* rolling forward */
+    pil_add_rotation_drive(w, wh, -v0 / r); // rolling forward
     pil_add_terrain_contact(w, ground, wh, r, kt, ct);
 
     pil_element *sp =
         pil_add_spring(w, pil_on(M, xs[i] - 0.09, -a / 2),
-                       pil_on(car, -0.09, r + 0.02), ks[i], pil_REST_INITIAL);
+                       pil_on(car, -0.09, r + 0.02), ks[i], PIL_REST_INITIAL);
     pil_element *dp = pil_add_damper(w, pil_on(M, xs[i] + 0.09, -a / 2),
                                      pil_on(car, 0.09, r + 0.02), ds[i]);
     pil_element_set_label(sp, kl[i]);

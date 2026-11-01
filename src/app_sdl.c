@@ -56,13 +56,15 @@ int pil_app_run(pil_world *w, pil_app_config *cfg) {
     fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
     return -1;
   }
+
   SDL_Window *win = SDL_CreateWindow(
       cfg->title ? cfg->title : "pil", SDL_WINDOWPOS_CENTERED,
       SDL_WINDOWPOS_CENTERED, cfg->width, cfg->height, SDL_WINDOW_RESIZABLE);
   SDL_Renderer *ren =
       win ? SDL_CreateRenderer(win, -1, SDL_RENDERER_PRESENTVSYNC) : NULL;
-  if (!ren && win)
+  if (!ren && win) {
     ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_SOFTWARE);
+  }
   if (!win || !ren) {
     fprintf(stderr, "SDL window: %s\n", SDL_GetError());
     SDL_Quit();
@@ -157,9 +159,10 @@ int pil_app_run(pil_world *w, pil_app_config *cfg) {
                                           pil_v2(e.button.x, e.button.y)),
                    loc;
           pil_body *b = pil_world_pick(w, wp, &loc);
-          if (b)
+          if (b) {
             pil_world_set_grab(w, b, loc, wp, cfg->grab_k * b->mass,
                                2.0 * sqrt(cfg->grab_k) * b->mass);
+          }
         } else {
           panning = 1;
           px = e.button.x;
@@ -167,15 +170,17 @@ int pil_app_run(pil_world *w, pil_app_config *cfg) {
         }
         break;
       case SDL_MOUSEBUTTONUP:
-        if (e.button.button == SDL_BUTTON_LEFT)
+        if (e.button.button == SDL_BUTTON_LEFT) {
           pil_world_clear_grab(w);
-        else
+        } else {
           panning = 0;
+        }
         break;
       case SDL_MOUSEMOTION:
-        if (w->grab.b)
+        if (w->grab.b) {
           w->grab.target =
               pil_view_to_world(&cfg->view, pil_v2(e.motion.x, e.motion.y));
+        }
         if (panning) {
           cfg->view.cx -= (e.motion.x - px) / cfg->view.scale;
           cfg->view.cy += (e.motion.y - py) / cfg->view.scale;
@@ -215,10 +220,12 @@ int pil_app_run(pil_world *w, pil_app_config *cfg) {
     if (cfg->on_frame) {
       cfg->on_frame(w, pil_world_time(w), cfg->user);
     }
+
     pil_draw_world(cr, w, &cfg->view, &cfg->style);
     if (cfg->show_hud) {
       draw_hud(cr, w, cfg, paused, speed);
     }
+
     cairo_surface_flush(surf);
     SDL_UpdateTexture(tex, NULL, cairo_image_surface_get_data(surf),
                       cairo_image_surface_get_stride(surf));

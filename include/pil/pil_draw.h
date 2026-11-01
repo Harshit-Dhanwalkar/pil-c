@@ -8,8 +8,9 @@
  * figure (grey bodies, coil springs, dashpots, hatched ground, hinges,
  * dimension lines, italic serif labels)
  */
-#ifndef pil_DRAW_H
-#define pil_DRAW_H
+
+#ifndef PIL_DRAW_H
+#define PIL_DRAW_H
 
 #include "pil_core.h"
 #include <cairo.h>
@@ -35,9 +36,11 @@ typedef struct {
   double ink[3];         /* line colour                             */
   double paper[3];       /* background                              */
   int draw_background;
-  int show_com;       /* draw centre-of-mass symbol              */
-  int spring_coils;   /* default number of coils                 */
-  double spring_w_px; /* default coil half-width in px           */
+  int text_halo; /* paper-coloured outline behind labels (readable over lines)
+                  */
+  int show_com;  /* draw centre-of-mass symbol                 */
+  int spring_coils;   /* default number of coils                    */
+  double spring_w_px; /* default coil half-width in px              */
   double hinge_r_px;
 } pil_style;
 

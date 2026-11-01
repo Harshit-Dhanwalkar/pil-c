@@ -16,8 +16,8 @@
  * Mouse:  left drag  pull a body with a soft spring
  *         wheel zoom,  right/middle drag pan
  */
-#ifndef pil_APP_H
-#define pil_APP_H
+#ifndef PIL_APP_H
+#define PIL_APP_H
 
 #include "pil_core.h"
 #include "pil_draw.h"

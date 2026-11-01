@@ -1,6 +1,7 @@
 /* Internal definitions shared by library sources */
-#ifndef pil_INTERNAL_H
-#define pil_INTERNAL_H
+
+#ifndef PIL_INTERNAL_H
+#define PIL_INTERNAL_H
 
 #include "pil/pil_core.h"
 #include <math.h>
@@ -21,6 +22,7 @@ typedef enum {
   EL_FIXED_ANGLE,
   EL_ROT_DRIVE,
   EL_ROLLING,
+  EL_CIRCLE_ROLL,
   EL_PULLEY,
   EL_FLOOR
 } pil_el_kind;
@@ -29,14 +31,16 @@ struct pil_element {
   pil_el_kind kind;
   pil_world *world;
   pil_anchor a, b;
-  double k, rest, c; /* spring / damper / torsion parameters        */
-  double length;     /* distance constraint                         */
-  double phase;      /* fixed angle / drive phase / rolling offset  */
-  double mu;         /* floor friction coefficient                  */
-  double omega;      /* drive rate                                  */
-  pil_vec2 dir;      /* slot direction (unit, in B local frame)     */
-  pil_vec2 p1, p2;   /* pulley rope: fixed tangent points            */
-  pil_vec2 f;        /* constant force                              */
+  double k, rest, c;   /* spring / damper / torsion parameters        */
+  double length;       /* distance constraint                         */
+  double phase;        /* fixed angle / drive phase / rolling offset  */
+  double mu;           /* floor friction coefficient                  */
+  double radius2, ref; /* circle rolling: track radius, reference angle */
+  int sigma;           /* circle rolling: -1 inside the track, +1 outside */
+  double omega;        /* drive rate                                  */
+  pil_vec2 dir;        /* slot direction (unit, in B local frame)     */
+  pil_vec2 p1, p2;     /* pulley rope: fixed tangent points            */
+  pil_vec2 f;          /* constant force                              */
   unsigned flags;
   pil_force_fn fn;
   void *user;
@@ -60,13 +64,20 @@ typedef enum {
   D_LINE,
   D_ANGLE,
   D_GROUND,
-  D_GRAVITY
+  D_GRAVITY,
+  D_ANGLE_PTS
 } pil_deco_kind;
 struct pil_deco {
   pil_deco_kind kind;
-  pil_anchor a, b;
-  double dx, dy, offset, radius, ref;
-  int dashed, hidden;
+  pil_anchor a, b, c;
+  double dx;
+  double dy;
+  double offset;
+  double radius;
+  double ref;
+  int dashed;
+  int hidden;
+  int reverse;
   pil_body *body;
   char text[48];
 };
@@ -82,8 +93,8 @@ typedef struct {
   void *user;
 } pil_overlay;
 
-/* \phi = position error, vel = d(\phi)/dt, ja/jb = Jacobian rows, \gamma = RHS
- * of J*a = \gamma (already includes Baumgarte terms) */
+/* \phi = position error, vel = d(\phi)/dt, ja/jb = Jacobian rows,
+ * \gamma = RHS of J*a = \gamma (already includes Baumgarte terms) */
 typedef struct {
   double phi, vel, ja[3], jb[3], gamma;
 } pil_row;
@@ -92,6 +103,7 @@ typedef struct {
   int idx;
   pil_row r;
   double lambda;
+  double target;
 } pil_rowrec;
 
 struct pil_world {
@@ -166,5 +178,7 @@ static inline int pil_isdyn(const pil_body *b) { return b && b->dof >= 0; }
 
 /* solver.c */
 void pil_compute_accel(pil_world *w);
+/* inelastic velocity impulse when a rope snaps taut while still extending
+ * (called after each step) */
 
 #endif

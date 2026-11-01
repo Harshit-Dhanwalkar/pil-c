@@ -13,7 +13,7 @@
 
 #define TWO_PI 6.28318530717958647692
 
-// style & view
+// Style & View
 pil_style pil_style_textbook(void) {
   pil_style s;
   memset(&s, 0, sizeof s);
@@ -28,6 +28,7 @@ pil_style pil_style_textbook(void) {
   s.paper[0] = s.paper[1] = s.paper[2] = 1.0;
   s.draw_background = 1;
   s.show_com = 1;
+  s.text_halo = 1;
   s.spring_coils = 7;
   s.spring_w_px = 10.0;
   s.hinge_r_px = 3.6;
@@ -67,7 +68,7 @@ static pil_vec2 S(const pil_view *v, pil_vec2 w) {
   return pil_view_to_screen(v, w);
 }
 
-// text with sub/superscripts
+// Text with sub/superscripts
 static int utf8_len(unsigned char c) {
   return c < 0x80         ? 1
          : (c >> 5) == 6  ? 2
@@ -106,6 +107,7 @@ static int utf8_encode(unsigned cp, char *o) {
     o[2] = (char)(0x80 | (cp & 0x3f));
     return 3;
   }
+
   o[0] = (char)(0xf0 | (cp >> 18));
   o[1] = (char)(0x80 | ((cp >> 12) & 0x3f));
   o[2] = (char)(0x80 | ((cp >> 6) & 0x3f));
@@ -132,7 +134,7 @@ static unsigned math_italic(unsigned cp) {
   return cp;
 }
 
-static double text_piece(cairo_t *cr, const char *family,
+static double text_piece(cairo_t *cr, const pil_style *st, const char *family,
                          cairo_font_slant_t slant, const char *s, int n,
                          double x, double y, double size, int draw) {
   char buf[128];
@@ -149,7 +151,17 @@ static double text_piece(cairo_t *cr, const char *family,
   cairo_set_font_size(cr, size);
   cairo_text_extents_t ext;
   cairo_text_extents(cr, buf, &ext);
-  if (draw) {
+  if (draw == 2) { // paper-coloured outline
+    cairo_save(cr);
+    cairo_new_path(cr);
+    cairo_move_to(cr, x, y);
+    cairo_text_path(cr, buf);
+    cairo_set_source_rgb(cr, st->paper[0], st->paper[1], st->paper[2]);
+    cairo_set_line_width(cr, 3.6);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+    cairo_stroke(cr);
+    cairo_restore(cr);
+  } else if (draw) {
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, buf);
   }
@@ -172,15 +184,16 @@ static double text_chunk(cairo_t *cr, const pil_style *st, const char *s, int n,
       j += l;
     }
 
-    if (j > i)
-      x += text_piece(cr, st->font, CAIRO_FONT_SLANT_ITALIC, s + i, j - i, x, y,
-                      size, draw);
+    if (j > i) {
+      x += text_piece(cr, st, st->font, CAIRO_FONT_SLANT_ITALIC, s + i, j - i,
+                      x, y, size, draw);
+    }
     if (j < n) {
       int l = utf8_len((unsigned char)s[j]);
       char g[8];
       int gl = utf8_encode(math_italic(utf8_decode(s + j, l)), g);
-      x += text_piece(cr, st->math_font, CAIRO_FONT_SLANT_NORMAL, g, gl, x, y,
-                      size, draw);
+      x += text_piece(cr, st, st->math_font, CAIRO_FONT_SLANT_NORMAL, g, gl, x,
+                      y, size, draw);
       j += l;
     }
     i = j;
@@ -191,7 +204,8 @@ static double text_chunk(cairo_t *cr, const pil_style *st, const char *s, int n,
 
 static double text_run(cairo_t *cr, const pil_style *st, const char *s,
                        double x, double y, int draw) {
-  double x0 = x, fs = st->font_px;
+  double x0 = x;
+  double fs = st->font_px;
   while (*s) {
     if (*s == '_' || *s == '^') {
       int sup = (*s == '^');
@@ -225,17 +239,28 @@ static double text_run(cairo_t *cr, const pil_style *st, const char *s,
   return x - x0;
 }
 
-void pil_draw_text(cairo_t *cr, pil_vec2 p, const char *text, double align,
-                   const pil_style *st) {
+static void text_draw(cairo_t *cr, pil_vec2 p, const char *text, double align,
+                      const pil_style *st, int halo) {
   if (!text || !*text) {
     return;
   }
 
   cairo_save(cr);
   double w = text_run(cr, st, text, 0, 0, 0);
+  double x = p.x - align * w;
+  double y = p.y + 0.33 * st->font_px;
+  if (halo) {
+    text_run(cr, st, text, x, y, 2);
+  }
+
   ink(cr, st);
-  text_run(cr, st, text, p.x - align * w, p.y + 0.33 * st->font_px, 1);
+  text_run(cr, st, text, x, y, 1);
   cairo_restore(cr);
+}
+
+void pil_draw_text(cairo_t *cr, pil_vec2 p, const char *text, double align,
+                   const pil_style *st) {
+  text_draw(cr, p, text, align, st, st->text_halo);
 }
 
 static double text_width(cairo_t *cr, const pil_style *st, const char *t) {
@@ -246,7 +271,7 @@ static double text_width(cairo_t *cr, const pil_style *st, const char *t) {
   return w;
 }
 
-/* symbols*/
+// symbols
 void pil_draw_hinge(cairo_t *cr, pil_vec2 p, const pil_style *st) {
   cairo_save(cr);
   cairo_new_path(cr);
@@ -326,7 +351,8 @@ void pil_draw_spring(cairo_t *cr, pil_vec2 a, pil_vec2 b, int coils, double hw,
 
   dx /= L;
   dy /= L;
-  double px = -dy, py = dx;
+  double px = -dy;
+  double py = dx;
   double lead = 0.17 * L;
   double Lc = L - 2 * lead;
   double bb = 0.85 * hw;
@@ -339,7 +365,8 @@ void pil_draw_spring(cairo_t *cr, pil_vec2 a, pil_vec2 b, int coils, double hw,
   cairo_move_to(cr, a.x, a.y);
   cairo_line_to(cr, a.x + dx * lead, a.y + dy * lead);
   for (int i = 1; i <= N; i++) {
-    double t = (double)i / N, th = TWO_PI * coils * t;
+    double t = (double)i / N;
+    double th = TWO_PI * coils * t;
     double along = lead + Lc * t + bb * (1.0 - cos(th));
     double lat = hw * sin(th);
     cairo_line_to(cr, a.x + dx * along + px * lat, a.y + dy * along + py * lat);
@@ -360,12 +387,14 @@ void pil_draw_dashpot(cairo_t *cr, pil_vec2 a, pil_vec2 b, double nominal,
 
   dx /= L;
   dy /= L;
-  double px = -dy, py = dx;
+  double px = -dy;
+  double py = dx;
   if (nominal < 20) {
     nominal = L;
   }
 
-  double s0 = 0.18 * nominal, s1 = s0 + 0.5 * nominal;
+  double s0 = 0.18 * nominal;
+  double s1 = s0 + 0.5 * nominal;
   double sp = L - 0.32 * nominal;
   if (sp < s0 + 3) {
     sp = s0 + 3;
@@ -380,18 +409,18 @@ void pil_draw_dashpot(cairo_t *cr, pil_vec2 a, pil_vec2 b, double nominal,
   cairo_set_line_cap(cr, CAIRO_LINE_CAP_BUTT);
   cairo_move_to(cr, a.x, a.y);
   cairo_line_to(cr, P(s0, 0));
-  cairo_stroke(cr); /* lead to cylinder */
+  cairo_stroke(cr); // lead to cylinder
   cairo_move_to(cr, P(s1, -w));
   cairo_line_to(cr, P(s0, -w));
   cairo_line_to(cr, P(s0, w));
   cairo_line_to(cr, P(s1, w));
-  cairo_stroke(cr); /* U-shaped cylinder */
+  cairo_stroke(cr); // U-shaped cylinder
   cairo_move_to(cr, P(sp, -w * 0.8));
   cairo_line_to(cr, P(sp, w * 0.8));
-  cairo_stroke(cr); /* piston */
+  cairo_stroke(cr); // piston
   cairo_move_to(cr, P(sp, 0));
   cairo_line_to(cr, b.x, b.y);
-  cairo_stroke(cr); /* rod */
+  cairo_stroke(cr); // rod
   cairo_restore(cr);
 #undef P
 }
@@ -406,7 +435,8 @@ void pil_draw_hatch(cairo_t *cr, pil_vec2 a, pil_vec2 b, const pil_style *st) {
 
   dx /= L;
   dy /= L;
-  double rx = -dy, ry = dx; // right of travel on screen (y down)
+  double rx = -dy;
+  double ry = dx; // right of travel on screen (y down)
   cairo_save(cr);
   ink(cr, st);
   cairo_set_line_width(cr, st->line_w);
@@ -424,13 +454,13 @@ void pil_draw_hatch(cairo_t *cr, pil_vec2 a, pil_vec2 b, const pil_style *st) {
   cairo_restore(cr);
 }
 
-/* bodies */
+// Bodies
 static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
   const pil_shape *s = &b->shape;
   pil_vec2 c0 = v_add(b->pos, v_rot(s->offset, b->angle));
   cairo_new_path(cr);
   switch (s->kind) {
-  case pil_SHAPE_RECT:
+  case PIL_SHAPE_RECT:
     for (int i = 0; i < 4; i++) {
       static const int cx[4] = {-1, 1, 1, -1}, cy[4] = {-1, -1, 1, 1};
       pil_vec2 p =
@@ -444,7 +474,7 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
     }
     cairo_close_path(cr);
     break;
-  case pil_SHAPE_POLY:
+  case PIL_SHAPE_POLY:
     for (int i = 0; i < s->npts; i++) {
       pil_vec2 p = S(v, v_add(c0, v_rot(s->pts[i], b->angle)));
       if (i == 0) {
@@ -455,12 +485,12 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
     }
     cairo_close_path(cr);
     break;
-  case pil_SHAPE_DISC: {
+  case PIL_SHAPE_DISC: {
     pil_vec2 c = S(v, c0);
     cairo_arc(cr, c.x, c.y, s->r * v->scale, 0, TWO_PI);
     break;
   }
-  case pil_SHAPE_POINT: {
+  case PIL_SHAPE_POINT: {
     pil_vec2 c = S(v, c0);
     double r = s->r * v->scale;
     if (r < 3.5) {
@@ -469,8 +499,9 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
     cairo_arc(cr, c.x, c.y, r, 0, TWO_PI);
     break;
   }
-  case pil_SHAPE_ARC_BAND: {
-    int N = 72, first = 1;
+  case PIL_SHAPE_ARC_BAND: {
+    int N = 72;
+    int first = 1;
     for (int i = 0; i <= N; i++) {
       double a = s->a0 + (s->a1 - s->a0) * i / N + b->angle;
       pil_vec2 p =
@@ -495,16 +526,17 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
 
 static void draw_body(cairo_t *cr, const pil_body *b, const pil_view *v,
                       const pil_style *st) {
-  if (b->flags & pil_HIDDEN) {
+  if (b->flags & PIL_HIDDEN) {
     return;
   }
+
   cairo_save(cr);
   body_path(cr, b, v);
-  if (b->shape.kind == pil_SHAPE_POINT) {
+  if (b->shape.kind == PIL_SHAPE_POINT) {
     ink(cr, st);
     cairo_fill(cr);
   } else {
-    if (!(b->flags & pil_NO_FILL)) {
+    if (!(b->flags & PIL_NO_FILL)) {
       double g = b->fill > 0 ? b->fill : st->body_fill;
       cairo_set_source_rgb(cr, g, g, g);
       cairo_fill_preserve(cr);
@@ -515,16 +547,17 @@ static void draw_body(cairo_t *cr, const pil_body *b, const pil_view *v,
     cairo_stroke(cr);
   }
 
-  if (b->shape.kind == pil_SHAPE_DISC && (b->flags & pil_SPOKE)) {
+  if (b->shape.kind == PIL_SHAPE_DISC && (b->flags & PIL_SPOKE)) {
     pil_vec2 c0 = v_add(b->pos, v_rot(b->shape.offset, b->angle));
-    pil_vec2 c = S(v, c0),
-             e = S(v, v_add(c0, v_rot(pil_v2(b->shape.r * 0.9, 0), b->angle)));
+    pil_vec2 c = S(v, c0);
+    pil_vec2 e = S(v, v_add(c0, v_rot(pil_v2(b->shape.r * 0.9, 0), b->angle)));
     ink(cr, st);
     cairo_set_line_width(cr, st->thin_w);
     cairo_move_to(cr, c.x, c.y);
     cairo_line_to(cr, e.x, e.y);
     cairo_stroke(cr);
   }
+
   cairo_restore(cr);
 }
 
@@ -532,12 +565,13 @@ static double align_for(double dx) {
   return dx < -1 ? 1.0 : (dx > 1 ? 0.0 : 0.5);
 }
 
-/* elements */
+// elements
 static void element_label(cairo_t *cr, const pil_element *e, pil_vec2 mid,
                           const pil_style *st) {
   if (!e->label[0]) {
     return;
   }
+
   pil_vec2 p = pil_v2(mid.x + e->label_dx, mid.y - e->label_dy);
   pil_draw_text(cr, p, e->label, align_for(e->label_dx), st);
 }
@@ -547,10 +581,12 @@ static void draw_element(cairo_t *cr, const pil_element *e, const pil_view *v,
   if (e->hidden) {
     return;
   }
+
   switch (e->kind) {
   case EL_SPRING:
   case EL_DAMPER: {
-    pil_vec2 a = S(v, pil_anchor_world(e->a)), b = S(v, pil_anchor_world(e->b));
+    pil_vec2 a = S(v, pil_anchor_world(e->a));
+    pil_vec2 b = S(v, pil_anchor_world(e->b));
     double hw = e->width_px > 0 ? e->width_px : st->spring_w_px;
     if (e->kind == EL_SPRING) {
       pil_draw_spring(cr, a, b, e->coils > 0 ? e->coils : st->spring_coils, hw,
@@ -562,9 +598,10 @@ static void draw_element(cairo_t *cr, const pil_element *e, const pil_view *v,
     break;
   }
   case EL_DISTANCE: {
-    pil_vec2 a = S(v, pil_anchor_world(e->a)), b = S(v, pil_anchor_world(e->b));
+    pil_vec2 a = S(v, pil_anchor_world(e->a));
+    pil_vec2 b = S(v, pil_anchor_world(e->b));
     cairo_save(cr);
-    if (e->flags & pil_ROPE) {
+    if (e->flags & PIL_ROPE) {
       ink(cr, st);
       cairo_set_line_width(cr, st->thin_w * 1.3);
       cairo_move_to(cr, a.x, a.y);
@@ -612,9 +649,10 @@ static void draw_joint_marks(cairo_t *cr, const pil_element *e,
   if (e->hidden) {
     return;
   }
+
   if (e->kind == EL_REVOLUTE) {
     pil_draw_hinge(cr, S(v, pil_anchor_world(e->a)), st);
-  } else if (e->kind == EL_DISTANCE && !(e->flags & pil_ROPE)) {
+  } else if (e->kind == EL_DISTANCE && !(e->flags & PIL_ROPE)) {
     pil_draw_hinge(cr, S(v, pil_anchor_world(e->a)), st);
     pil_draw_hinge(cr, S(v, pil_anchor_world(e->b)), st);
   } else if (e->kind == EL_SPRING || e->kind == EL_DAMPER) {
@@ -656,13 +694,15 @@ static void draw_terrain(cairo_t *cr, const pil_terrain *t, double time,
   cairo_restore(cr);
 }
 
-/* annotations                                                         */
+// Annotations
 static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
                       const pil_style *st) {
   if (d->hidden) {
     return;
   }
-  pil_vec2 A = S(v, pil_anchor_world(d->a)), B = S(v, pil_anchor_world(d->b));
+
+  pil_vec2 A = S(v, pil_anchor_world(d->a));
+  pil_vec2 B = S(v, pil_anchor_world(d->b));
   switch (d->kind) {
   case D_LABEL:
     pil_draw_text(cr, pil_v2(A.x + d->dx, A.y - d->dy), d->text,
@@ -690,7 +730,11 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     break;
   case D_ARROW: {
     pil_vec2 T = pil_v2(A.x + d->dx, A.y - d->dy);
-    pil_draw_arrow(cr, A, T, 10, st);
+    if (d->reverse) {
+      pil_draw_arrow(cr, T, A, 10, st);
+    } else {
+      pil_draw_arrow(cr, A, T, 10, st);
+    }
     if (d->text[0]) {
       double L = sqrt(d->dx * d->dx + d->dy * d->dy);
       double ux = L > 0 ? d->dx / L : 1, uy = L > 0 ? -d->dy / L : 0;
@@ -700,15 +744,20 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     break;
   }
   case D_DIM: {
-    double dx = B.x - A.x, dy = B.y - A.y, L = sqrt(dx * dx + dy * dy);
+    double dx = B.x - A.x;
+    double dy = B.y - A.y;
+    double L = sqrt(dx * dx + dy * dy);
     if (L < 4) {
       break;
     }
     dx /= L;
     dy /= L;
-    double nx = dy, ny = -dx, o = d->offset, ext = o + (o >= 0 ? 5 : -5);
-    pil_vec2 A2 = pil_v2(A.x + nx * o, A.y + ny * o),
-             B2 = pil_v2(B.x + nx * o, B.y + ny * o);
+    double nx = dy;
+    double ny = -dx;
+    double o = d->offset;
+    double ext = o + (o >= 0 ? 5 : -5);
+    pil_vec2 A2 = pil_v2(A.x + nx * o, A.y + ny * o);
+    pil_vec2 B2 = pil_v2(B.x + nx * o, B.y + ny * o);
     cairo_save(cr);
     ink(cr, st);
     cairo_set_line_width(cr, st->thin_w * 0.85);
@@ -722,7 +771,8 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     cairo_stroke(cr);
     cairo_restore(cr);
     double tw = d->text[0] ? text_width(cr, st, d->text) + 8 : 0;
-    double mx = 0.5 * (A2.x + B2.x), my = 0.5 * (A2.y + B2.y);
+    double mx = 0.5 * (A2.x + B2.x);
+    double my = 0.5 * (A2.y + B2.y);
     if (tw > 0 && tw < L - 24) {
       pil_draw_arrow(cr, pil_v2(mx - dx * tw * 0.5, my - dy * tw * 0.5), A2, 9,
                      st);
@@ -737,8 +787,38 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     }
     break;
   }
+  case D_ANGLE_PTS: {
+    pil_vec2 P2 = S(v, pil_anchor_world(d->c));
+    double a1 = atan2(B.y - A.y, B.x - A.x);
+    double a2 = atan2(P2.y - A.y, P2.x - A.x);
+    double da = a2 - a1;
+    while (da > 0.5 * TWO_PI) {
+      da -= TWO_PI;
+    }
+    while (da < -0.5 * TWO_PI) {
+      da += TWO_PI;
+    }
+    cairo_save(cr);
+    ink(cr, st);
+    cairo_set_line_width(cr, st->thin_w);
+    cairo_new_path(cr);
+    if (da >= 0) {
+      cairo_arc(cr, A.x, A.y, d->radius, a1, a1 + da);
+    } else {
+      cairo_arc(cr, A.x, A.y, d->radius, a1 + da, a1);
+    }
+    cairo_stroke(cr);
+    cairo_restore(cr);
+    double mid = a1 + 0.5 * da;
+    pil_draw_text(cr,
+                  pil_v2(A.x + (d->radius + 12) * cos(mid),
+                         A.y + (d->radius + 12) * sin(mid)),
+                  d->text, 0.5, st);
+    break;
+  }
   case D_ANGLE: {
-    double th = d->body ? d->body->angle : 0, r = d->radius;
+    double th = d->body ? d->body->angle : 0;
+    double r = d->radius;
     cairo_save(cr);
     ink(cr, st);
     cairo_set_line_width(cr, st->thin_w);
@@ -759,7 +839,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
   }
 }
 
-/* frame */
+// Frame
 void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
                     const pil_style *st) {
   cairo_save(cr);
@@ -788,34 +868,39 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   for (int i = 0; i < w->nels; i++) {
     draw_joint_marks(cr, w->els[i], v, st);
   }
+
   if (st->show_com) {
     for (int i = 0; i < w->nbodies; i++) {
       const pil_body *b = w->bodies[i];
-      if (b->shape.kind == pil_SHAPE_POINT ||
-          (b->flags & (pil_HIDE_COM | pil_HIDDEN)) || b->dof < 0) {
+      if (b->shape.kind == PIL_SHAPE_POINT ||
+          (b->flags & (PIL_HIDE_COM | PIL_HIDDEN)) || b->dof < 0) {
         continue;
       }
       pil_draw_com(cr, S(v, b->pos), st);
     }
   }
-  for (int i = 0; i < w->ndecos; i++)
+
+  for (int i = 0; i < w->ndecos; i++) {
     if (w->decos[i]->kind != D_GROUND) {
       draw_deco(cr, w->decos[i], v, st);
     }
+  }
   for (int i = 0; i < w->nbodies; i++) {
     const pil_body *b = w->bodies[i];
-    if (!b->label[0] || (b->flags & pil_HIDDEN)) {
+    if (!b->label[0] || (b->flags & PIL_HIDDEN)) {
       continue;
     }
 
     pil_vec2 c = S(v, b->pos);
-    double dx = b->label_dx, dy = b->label_dy;
+    double dx = b->label_dx;
+    double dy = b->label_dy;
     if (dx == 0 && dy == 0) {
       dx = 14;
       dy = 14;
     }
 
-    pil_draw_text(cr, pil_v2(c.x + dx, c.y - dy), b->label, align_for(dx), st);
+    text_draw(cr, pil_v2(c.x + dx, c.y - dy), b->label, align_for(dx), st,
+              0); // sits on body: no halo
   }
 
   for (int i = 0; i < w->noverlays; i++) {
@@ -824,7 +909,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   cairo_restore(cr);
 }
 
-/* export */
+// Export
 int pil_export_png(const pil_world *w, const pil_view *v, const pil_style *st,
                    const char *path) {
   cairo_surface_t *s = cairo_image_surface_create(
