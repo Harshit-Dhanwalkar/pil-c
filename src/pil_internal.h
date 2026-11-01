@@ -1,0 +1,170 @@
+/* Internal definitions shared by library sources */
+#ifndef pil_INTERNAL_H
+#define pil_INTERNAL_H
+
+#include "pil/pil_core.h"
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef enum {
+  EL_SPRING,
+  EL_DAMPER,
+  EL_TORSION,
+  EL_FORCE,
+  EL_CUSTOM,
+  EL_TERRAIN_CONTACT,
+  EL_REVOLUTE,
+  EL_DISTANCE,
+  EL_SLOT,
+  EL_FIXED_ANGLE,
+  EL_ROT_DRIVE,
+  EL_ROLLING,
+  EL_PULLEY,
+  EL_FLOOR
+} pil_el_kind;
+
+struct pil_element {
+  pil_el_kind kind;
+  pil_world *world;
+  pil_anchor a, b;
+  double k, rest, c; /* spring / damper / torsion parameters        */
+  double length;     /* distance constraint                         */
+  double phase;      /* fixed angle / drive phase / rolling offset  */
+  double mu;         /* floor friction coefficient                  */
+  double omega;      /* drive rate                                  */
+  pil_vec2 dir;      /* slot direction (unit, in B local frame)     */
+  pil_vec2 p1, p2;   /* pulley rope: fixed tangent points            */
+  pil_vec2 f;        /* constant force                              */
+  unsigned flags;
+  pil_force_fn fn;
+  void *user;
+  pil_terrain *terrain;
+  double radius;
+  int rope_off; /* set by solver when a rope goes slack */
+  double last_force;
+  /* drawing */
+  int hidden;
+  int coils;
+  double width_px;
+  char label[32];
+  double label_dx, label_dy;
+  int label_auto;
+};
+
+typedef enum {
+  D_LABEL,
+  D_DIM,
+  D_ARROW,
+  D_LINE,
+  D_ANGLE,
+  D_GROUND,
+  D_GRAVITY
+} pil_deco_kind;
+struct pil_deco {
+  pil_deco_kind kind;
+  pil_anchor a, b;
+  double dx, dy, offset, radius, ref;
+  int dashed, hidden;
+  pil_body *body;
+  char text[48];
+};
+
+struct pil_terrain {
+  pil_height_fn fn;
+  void *user;
+  double scroll;
+};
+
+typedef struct {
+  pil_overlay_fn fn;
+  void *user;
+} pil_overlay;
+
+/* \phi = position error, vel = d(\phi)/dt, ja/jb = Jacobian rows, \gamma = RHS
+ * of J*a = \gamma (already includes Baumgarte terms) */
+typedef struct {
+  double phi, vel, ja[3], jb[3], gamma;
+} pil_row;
+typedef struct {
+  pil_element *el;
+  int idx;
+  pil_row r;
+  double lambda;
+} pil_rowrec;
+
+struct pil_world {
+  pil_body **bodies;
+  int nbodies, bcap, ndyn;
+  pil_element **els;
+  int nels, ecap;
+  pil_deco **decos;
+  int ndecos, dcap;
+  pil_terrain **terrains;
+  int nterr, tcap;
+  pil_overlay *overlays;
+  int noverlays, ocap;
+  pil_vec2 g;
+  double t, tcur, alpha, beta, drag_lin, drag_ang;
+  int frozen;
+  int have_snapshot;
+  struct {
+    pil_body *b;
+    pil_vec2 local, target;
+    double k, c;
+  } grab;
+  /* scratch */
+  double *K, *rhs;
+  int kcap;
+  pil_rowrec *rows;
+  int rowcap;
+  double *s0, *k1, *k2, *k3, *k4, *tmp;
+  int scap;
+};
+
+/* vector helpers */
+static inline pil_vec2 v_add(pil_vec2 a, pil_vec2 b) {
+  return pil_v2(a.x + b.x, a.y + b.y);
+}
+static inline pil_vec2 v_sub(pil_vec2 a, pil_vec2 b) {
+  return pil_v2(a.x - b.x, a.y - b.y);
+}
+static inline pil_vec2 v_mul(pil_vec2 a, double s) {
+  return pil_v2(a.x * s, a.y * s);
+}
+static inline double v_dot(pil_vec2 a, pil_vec2 b) {
+  return a.x * b.x + a.y * b.y;
+}
+static inline double v_cross(pil_vec2 a, pil_vec2 b) {
+  return a.x * b.y - a.y * b.x;
+}
+static inline pil_vec2 v_perp(pil_vec2 a) { return pil_v2(-a.y, a.x); }
+static inline pil_vec2 v_rot(pil_vec2 a, double th) {
+  double c = cos(th), s = sin(th);
+  return pil_v2(c * a.x - s * a.y, s * a.x + c * a.y);
+}
+
+/* anchor helpers: offset r from body COM in world axes, world point,
+ * velocity */
+pil_vec2 pil_anchor_r(pil_anchor a);
+pil_vec2 pil_anchor_vel(pil_anchor a);
+
+/* elements.c */
+/* Fills up to 2 rows; returns row count. A slack rope returns 0 unless
+ * force_active */
+int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
+                        int force_active);
+int pil_is_constraint(const pil_element *e);
+int pil_is_rope(const pil_element *e); /* one-sided (pull-only) constraint */
+double pil_rope_length(const pil_element *e); /* current geometric length */
+void pil_element_apply(pil_element *e, pil_world *w, double t);
+double pil_element_energy(const pil_element *e, double t);
+void pil_elements_rebase(
+    pil_world *w); /* re-derive phases after a state reset */
+static inline int pil_isdyn(const pil_body *b) { return b && b->dof >= 0; }
+
+/* solver.c */
+void pil_compute_accel(pil_world *w);
+
+#endif
