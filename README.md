@@ -8,12 +8,12 @@ interactive window.
 
 <table>
   <tr>
-    <td align="center"><img src="docs/assets/half.png" width="250"><br><b>Half-Car on Wavy Road</b></td>
-    <td align="center"><img src="docs/assets/incline.png" width="250"><br><b>Cylinder & Block on Wedge</b></td>
+    <td align="center"><img src="docs/assets/half.gif" width="250"><br><b>Half-Car on Wavy Road</b></td>
+    <td align="center"><img src="docs/assets/incline.gif" width="250"><br><b>Cylinder & Block on Wedge</b></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/assets/atwood.png" width="200"><br><b>Atwood Machine</b></td>
-    <td align="center"><img src="docs/assets/bowl.png" width="250"><br><b>Circle-in-Circle Rolling</b></td>
+    <td align="center"><img src="docs/assets/atwood.gif" width="200"><br><b>Atwood Machine</b></td>
+    <td align="center"><img src="docs/assets/bowl.gif" width="250"><br><b>Circle-in-Circle Rolling</b></td>
   </tr>
 </table>
 
@@ -36,7 +36,7 @@ sudo make install        # headers, libpil.a, pil.pc
 ```
 
 Use it from your own program with `cc prog.c $(pkg-config --cflags --libs pil)`.
-Text uses *Latin Modern* (Roman + Math) if installed, as it is with TeX Live.
+Text uses *Latin Modern* (Roman + Math) if installed, as it is with $\TeX$ Live.
 
 ## Try it
 
@@ -44,8 +44,11 @@ Text uses *Latin Modern* (Roman + Math) if installed, as it is with TeX Live.
 ./build/halfcar   half.png            # render the first frame
 ./build/halfcar   --record half.gif 5 # simulate 5 s into a gif (mp4/webm also work)
 ./build/halfcar   --live              # interactive window
-./build/incline   --live
-./build/atwood    --live
+
+# other examples
+./build/incline
+./build/atwood
+./build/bowl
 ```
 
 Window keys: `space` pause · `r` reset · `→` step · `+`/`-` speed · `p`/`f`/`g` save

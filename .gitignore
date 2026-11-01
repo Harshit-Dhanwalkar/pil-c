@@ -60,12 +60,11 @@ dist/
 
 # Generated outputs
 *.png
-!docs/assets/*.png
-
 *.gif
 *.mp4
 *.svg
 *.pdf
+!docs/assets/*
 
 # Others
 compile_commands.json
