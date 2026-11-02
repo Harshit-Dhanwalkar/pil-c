@@ -17,6 +17,7 @@ interactive window.
   </tr>
   <tr>
     <td align="center"><img src="docs/assets/blocks.gif" width="200"><br><b>Two blocks with pendulums</b></td>
+    <td align="center"><img src="docs/assets/ring.gif" width="200"><br><b>Two blocks with pendulums</b></td>
   </tr>
 </table>
 
@@ -52,6 +53,8 @@ Text uses *Latin Modern* (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/incline
 ./build/atwood
 ./build/bowl
+./build/blocks
+./build/ring
 ```
 
 Window keys: `space` pause · `r` reset · `→` step · `+`/`-` speed · `p`/`f`/`g` save
