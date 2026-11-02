@@ -312,6 +312,8 @@ pil_deco *pil_add_angle_between(pil_world *w, pil_anchor center, pil_anchor p1,
 pil_deco *pil_add_ground(pil_world *w, pil_vec2 a, pil_vec2 b);
 /* Small "g" arrow in corner of textbook figures */
 pil_deco *pil_add_gravity_indicator(pil_world *w, pil_vec2 at);
+/* "g (x)": gravity pointing into the page (plan-view figures) */
+pil_deco *pil_add_gravity_into_page(pil_world *w, pil_vec2 at);
 /* Arc from world angle `ref_angle` to live angle of `body` */
 pil_deco *pil_add_angle_marker(pil_world *w, pil_anchor center,
                                double ref_angle, pil_body *body,
