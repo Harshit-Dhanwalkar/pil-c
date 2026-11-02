@@ -210,6 +210,32 @@ pil_vec2 pil_body_point(const pil_body *b, pil_vec2 local) {
   return v_add(b->pos, v_rot(local, b->angle));
 }
 
+pil_anchor pil_on_at(pil_body *b, double x, double y) {
+  pil_vec2 l = v_rot(v_sub(pil_v2(x, y), b->pos), -b->angle);
+
+  return pil_on(b, l.x, l.y);
+}
+
+pil_vec2 pil_poly_centroid(const pil_vec2 *pts, int n) {
+  double A = 0;
+  double cx = 0;
+  double cy = 0;
+  for (int i = 0; i < n; i++) {
+    pil_vec2 p = pts[i];
+    pil_vec2 q = pts[(i + 1) % n];
+    double cr = v_cross(p, q);
+    A += cr;
+    cx += (p.x + q.x) * cr;
+    cy += (p.y + q.y) * cr;
+  }
+
+  if (fabs(A) < 1e-14) {
+    return n > 0 ? pts[0] : pil_v2(0, 0);
+  }
+
+  return pil_v2(cx / (3.0 * A), cy / (3.0 * A));
+}
+
 pil_vec2 pil_body_shape_origin(const pil_body *b) { return b->shape.offset; }
 
 pil_vec2 pil_body_velocity_at(const pil_body *b, pil_vec2 p) {
@@ -220,6 +246,7 @@ void pil_apply_force(pil_body *b, pil_vec2 p, pil_vec2 f) {
   if (!b || b->dof < 0) {
     return;
   }
+
   b->force = v_add(b->force, f);
   b->torque += v_cross(v_sub(p, b->pos), f);
 }

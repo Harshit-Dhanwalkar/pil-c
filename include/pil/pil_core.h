@@ -155,6 +155,12 @@ static inline pil_anchor pil_at(double x, double y) {
   return a;
 }
 pil_vec2 pil_anchor_world(pil_anchor a);
+/* Anchor on `b` at point that is currently at world (x, y) - lets a figure be
+ * authored in world coordinates whatever body's pose */
+pil_anchor pil_on_at(pil_body *b, double x, double y);
+/* Area centroid of a polygon: a pil_poly body's COM sits there, so .pos =
+ * pil_poly_centroid(pts, n) places polygon exactly where its points say */
+pil_vec2 pil_poly_centroid(const pil_vec2 *pts, int n);
 
 /* World */
 pil_world *pil_world_new(void);

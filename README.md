@@ -13,10 +13,13 @@ interactive window.
   </tr>
   <tr>
     <td align="center"><img src="docs/assets/atwood.gif" width="200"><br><b>Atwood Machine</b></td>
-    <td align="center"><img src="docs/assets/bowl.gif" width="250"><br><b>Circle-in-Circle Rolling</b></td>
+    <td align="center"><img src="docs/assets/blocks.gif" width="200"><br><b>Two blocks with pendulums</b></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/assets/blocks.gif" width="200"><br><b>Two blocks with pendulums</b></td>
+    <td align="center"><img src="docs/assets/bowl.gif" width="250"><br><b>Circle-in-Circle Rolling</b></td>
+    <td align="center"><img src="docs/assets/crank.gif" width="200"><br><b>Disc driving a crank and rod into of coupled sliding masses</b></td>
+  </tr>
+  <tr>
     <td align="center"><img src="docs/assets/ring.gif" width="200"><br><b>Two blocks with pendulums</b></td>
   </tr>
 </table>
@@ -50,10 +53,11 @@ Text uses *Latin Modern* (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/halfcar   --live              # interactive window
 
 # other examples
-./build/incline
 ./build/atwood
-./build/bowl
 ./build/blocks
+./build/bowl
+./build/crank
+./build/incline
 ./build/ring
 ```
 
