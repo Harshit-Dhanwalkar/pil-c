@@ -20,6 +20,7 @@ interactive window.
     <td align="center"><img src="docs/assets/crank.gif" width="200"><br><b>Disc driving a crank and rod into of coupled sliding masses</b></td>
   </tr>
   <tr>
+    <td align="center"><img src="docs/assets/frame.gif" width="200"><br><b>Sliding frame with two sprung blocks, a two-link arm with a torsion knee, a sprung link and k4 spring to the wall</b></td>
     <td align="center"><img src="docs/assets/ring.gif" width="200"><br><b>Two blocks with pendulums</b></td>
   </tr>
 </table>
@@ -57,6 +58,7 @@ Text uses *Latin Modern* (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/blocks
 ./build/bowl
 ./build/crank
+./build/frame
 ./build/incline
 ./build/ring
 ```
