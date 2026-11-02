@@ -614,6 +614,13 @@ static pil_deco *new_deco(pil_world *w, pil_deco_kind k, const char *text) {
   return d;
 }
 
+pil_deco *pil_add_gravity_into_page(pil_world *w, pil_vec2 at) {
+  pil_deco *d = pil_add_gravity_indicator(w, at);
+  d->ref = 1;
+
+  return d;
+}
+
 pil_deco *pil_add_label(pil_world *w, pil_anchor at, const char *text,
                         double dx, double dy) {
   pil_deco *d = new_deco(w, D_LABEL, text);

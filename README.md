@@ -15,6 +15,9 @@ interactive window.
     <td align="center"><img src="docs/assets/atwood.gif" width="200"><br><b>Atwood Machine</b></td>
     <td align="center"><img src="docs/assets/bowl.gif" width="250"><br><b>Circle-in-Circle Rolling</b></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/assets/blocks.gif" width="200"><br><b>Two blocks with pendulums</b></td>
+  </tr>
 </table>
 
 

@@ -712,6 +712,24 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     pil_draw_hatch(cr, A, B, st);
     break;
   case D_GRAVITY:
+    if (d->ref != 0) { // gravity into page: "g (x)"
+      const double r = 7.5;
+      const double cx = A.x + 14;
+      const double cy = A.y;
+      const double k = r * 0.7071;
+      pil_draw_text(cr, pil_v2(A.x - 2, A.y), d->text, 1.0, st);
+      cairo_save(cr);
+      ink(cr, st);
+      cairo_set_line_width(cr, st->thin_w);
+      cairo_arc(cr, cx, cy, r, 0, 2 * M_PI);
+      cairo_move_to(cr, cx - k, cy - k);
+      cairo_line_to(cr, cx + k, cy + k);
+      cairo_move_to(cr, cx - k, cy + k);
+      cairo_line_to(cr, cx + k, cy - k);
+      cairo_stroke(cr);
+      cairo_restore(cr);
+      break;
+    }
     pil_draw_arrow(cr, A, pil_v2(A.x, A.y + 38), 10, st);
     pil_draw_text(cr, pil_v2(A.x + 9, A.y + 14), d->text, 0.0, st);
     break;
