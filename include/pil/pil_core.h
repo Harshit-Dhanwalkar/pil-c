@@ -268,9 +268,9 @@ pil_element *pil_add_circle_rolling(pil_world *w, pil_anchor a, double ra,
  * it a pulley disc, a roller and a shuttle can be tied together with their
  * inertia */
 typedef enum {
-  pil_COORD_X = 0,
-  pil_COORD_Y = 1,
-  pil_COORD_ANGLE = 2
+  PIL_COORD_X = 0,
+  PIL_COORD_Y = 1,
+  PIL_COORD_ANGLE = 2
 } pil_coord;
 pil_element *pil_add_link(pil_world *w, pil_body *a, pil_coord ca, pil_body *b,
                           pil_coord cb, double ratio);

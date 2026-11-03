@@ -48,7 +48,7 @@ static double coord_q(const pil_body *b, int c) {
     return 0.0;
   }
 
-  return c == pil_COORD_X ? b->pos.x : (c == pil_COORD_Y ? b->pos.y : b->angle);
+  return c == PIL_COORD_X ? b->pos.x : (c == PIL_COORD_Y ? b->pos.y : b->angle);
 }
 
 static double coord_v(const pil_body *b, int c) {
@@ -56,7 +56,7 @@ static double coord_v(const pil_body *b, int c) {
     return 0.0;
   }
 
-  return c == pil_COORD_X ? b->vel.x : (c == pil_COORD_Y ? b->vel.y : b->omega);
+  return c == PIL_COORD_X ? b->vel.x : (c == PIL_COORD_Y ? b->vel.y : b->omega);
 }
 
 // Creation
