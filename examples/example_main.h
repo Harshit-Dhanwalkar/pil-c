@@ -15,18 +15,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* An example can slow itself down (circuits live in milliseconds): define
+ * PIL_EXAMPLE_TIME_SCALE before including this header */
+#ifndef PIL_EXAMPLE_TIME_SCALE
+#define PIL_EXAMPLE_TIME_SCALE 1.0
+#endif
+
 static int example_main(pil_world *w, pil_view *view, const char *title,
                         int argc, char **argv, const char *default_png) {
   pil_style st = pil_style_textbook();
   int rc = 0;
   (void)title; // only used by SDL window
-  
+
   if (argc > 1 && !strcmp(argv[1], "--live")) {
 #ifdef PIL_HAVE_SDL
     pil_app_config cfg =
         pil_app_defaults(title, (int)view->width, (int)view->height);
     cfg.view = *view;
     cfg.style = st;
+    cfg.time_scale = PIL_EXAMPLE_TIME_SCALE;
 
     for (int i = 2; i + 1 < argc; i++) {
       if (!strcmp(argv[i], "--frames")) {
@@ -44,7 +51,8 @@ static int example_main(pil_world *w, pil_view *view, const char *title,
 #endif
   } else if (argc > 2 && !strcmp(argv[1], "--record")) {
     double secs = argc > 3 ? atof(argv[3]) : 4.0;
-    rc = pil_record(w, view, &st, argv[2], secs, 30.0, 5e-4);
+    rc = pil_record_ex(w, view, &st, argv[2], secs, 30.0, 5e-4,
+                       PIL_EXAMPLE_TIME_SCALE);
     printf(rc ? "record failed (is ffmpeg installed?)\n"
               : "recorded %s (%.1f s)\n",
            argv[2], secs);
