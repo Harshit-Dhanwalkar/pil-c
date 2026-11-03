@@ -407,7 +407,9 @@ static void test_link_and_plot(void) {
   puts("linear link (effective inertia) and plot recording");
   pil_world *w = pil_world_new();
   pil_world_set_gravity(w, 0, -9.81);
-  double ma = 1.0, mb = 0.5, ratio = -2.0;
+  double ma = 1.0;
+  double mb = 0.5;
+  double ratio = -2.0;
   pil_body *a = pil_add_body(
       w,
       &(pil_body_desc){.shape = pil_rect(0.2, 0.2), .mass = ma, .pos = {0, 5}});
@@ -417,7 +419,7 @@ static void test_link_and_plot(void) {
   pil_add_prismatic(w, pil_on(a, 0, 0), pil_at(0, 0), (pil_vec2){0, 1});
   pil_add_prismatic(w, pil_on(b, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
   // b.x = ratio * a.y + const: b moves |ratio| times as far as a drops
-  pil_add_link(w, b, pil_COORD_X, a, pil_COORD_Y, ratio);
+  pil_add_link(w, b, PIL_COORD_X, a, PIL_COORD_Y, ratio);
   pil_plot *p = pil_add_plot(w, 0.5, 0.5, 1, 1, "t [s]", "y", 1.0);
   pil_plot_add_signal(p, "y", sig_y, a);
   pil_plots_record(w, 0.1, 1e-3);

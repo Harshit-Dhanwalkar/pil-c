@@ -9,7 +9,7 @@ BUILD   := build
 
 override CFLAGS += -std=gnu99 -Wall -Wextra -Iinclude -Isrc $(shell pkg-config --cflags cairo)
 override LIBS := $(shell pkg-config --libs cairo) -lm
-SRCS     := src/world.c src/elements.c src/solver.c src/draw.c src/plot.c
+SRCS    := src/world.c src/elements.c src/solver.c src/draw.c src/plot.c src/circuit.c src/circuit_draw.c
 
 HAVE_SDL := $(shell pkg-config --exists sdl2 && echo 1)
 ifeq ($(HAVE_SDL),1)

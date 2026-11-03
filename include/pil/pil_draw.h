@@ -38,7 +38,7 @@ typedef struct {
   int draw_background;
   int text_halo; /* paper-coloured outline behind labels (readable over lines)
                   */
-  int show_com;       /* draw centre-of-mass symbol                     */
+  int show_com;  /* draw centre-of-mass symbol                     */
   int spring_coils;   /* default number of coils                        */
   int upright;        /* set: Latin text in upright face (plot numbers) */
   double spring_w_px; /* default coil half-width in px                  */
@@ -75,6 +75,12 @@ int pil_export_svg(const pil_world *w, const pil_view *v, const pil_style *st,
  * Returns 0 on success */
 int pil_record(pil_world *w, const pil_view *v, const pil_style *st,
                const char *path, double seconds, double fps, double max_dt);
+
+/* Same, with slow motion: one second of video shows `time_scale` seconds of
+ * simulated time (time_scale = 0.001 animates a millisecond-scale circuit) */
+int pil_record_ex(pil_world *w, const pil_view *v, const pil_style *st,
+                  const char *path, double seconds, double fps, double max_dt,
+                  double time_scale);
 
 /* public primitives (screen coordinates, y down) */
 void pil_draw_spring(cairo_t *cr, pil_vec2 a, pil_vec2 b, int coils,

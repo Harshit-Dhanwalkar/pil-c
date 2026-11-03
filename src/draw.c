@@ -6,6 +6,7 @@
 /* draw.c - textbook-style Cairo renderer */
 
 #include "pil/pil_draw.h"
+#include "pil_circuit_draw.h"
 #include "pil_internal.h"
 #include "plot.h"
 #include <math.h>
@@ -897,6 +898,9 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
       draw_deco(cr, w->decos[i], v, st);
     }
   }
+  for (int i = 0; i < w->ncircuits; i++) {
+    pil_circuit_draw(cr, w->circuits[i], v, st);
+  }
   for (int i = 0; i < w->nels; i++) {
     draw_element(cr, w->els[i], v, st);
   }
@@ -1016,6 +1020,12 @@ int pil_export_svg(const pil_world *w, const pil_view *v, const pil_style *st,
 
 int pil_record(pil_world *w, const pil_view *v, const pil_style *st,
                const char *path, double seconds, double fps, double max_dt) {
+  return pil_record_ex(w, v, st, path, seconds, fps, max_dt, 1.0);
+}
+
+int pil_record_ex(pil_world *w, const pil_view *v, const pil_style *st,
+                  const char *path, double seconds, double fps, double max_dt,
+                  double time_scale) {
   int W = (int)v->width & ~1, H = (int)v->height & ~1;
   size_t plen = strlen(path);
   const char *opts = "-c:v libx264 -pix_fmt yuv420p -crf 18 -preset veryfast";
@@ -1040,6 +1050,7 @@ int pil_record(pil_world *w, const pil_view *v, const pil_style *st,
   cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, W, H);
   cairo_t *cr = cairo_create(s);
   int frames = (int)(seconds * fps + 0.5);
+  double sim_dt = (time_scale > 0 ? time_scale : 1.0) / fps;
   for (int f = 0; f < frames; f++) {
     pil_draw_world(cr, w, v, st);
     cairo_surface_flush(s);
@@ -1049,7 +1060,7 @@ int pil_record(pil_world *w, const pil_view *v, const pil_style *st,
       fwrite(d + (size_t)y * stride, 4, (size_t)W, p);
     }
 
-    pil_world_advance((pil_world *)w, 1.0 / fps, max_dt);
+    pil_world_advance((pil_world *)w, sim_dt, max_dt);
   }
 
   cairo_destroy(cr);

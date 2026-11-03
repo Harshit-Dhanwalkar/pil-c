@@ -291,6 +291,7 @@ void pil_world_free(pil_world *w) {
     free(w->terrains[i]);
   }
   pil_plots_free(w);
+  pil_circuits_free(w);
   free(w->bodies);
   free(w->els);
   free(w->decos);
@@ -373,6 +374,7 @@ void pil_world_step(pil_world *w, double dt) {
   if (n == 0) {
     if (!w->frozen) {
       w->t += dt;
+      pil_circuits_step(w, dt);
     }
 
     return;
@@ -524,7 +526,9 @@ void pil_world_reset(pil_world *w) {
   for (int i = 0; i < w->nels; i++) {
     w->els[i]->rope_off = 0;
   }
+
   pil_elements_rebase(w);
+  pil_circuits_reset(w);
 }
 
 void pil_world_settle(pil_world *w, double seconds) {
@@ -554,6 +558,7 @@ void pil_world_settle(pil_world *w, double seconds) {
   }
 
   w->t = 0;
+
   pil_world_snapshot(w);
   pil_elements_rebase(w);
 }
