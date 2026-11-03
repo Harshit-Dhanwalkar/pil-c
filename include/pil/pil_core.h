@@ -262,12 +262,24 @@ pil_element *pil_add_rolling(pil_world *w, pil_body *b, pil_vec2 center_local,
  * Contact is bilateral: ball cannot leave surface */
 pil_element *pil_add_circle_rolling(pil_world *w, pil_anchor a, double ra,
                                     pil_anchor b, double rb, int inside);
+/* Linear kinematic link: qa - ratio * qb = const, where q is one coordinate
+ * (x, y or angle) of a body (NULL = world, always 0)
+ * Generic building lock for belts, gears, racks and rope-driven followers: with
+ * it a pulley disc, a roller and a shuttle can be tied together with their
+ * inertia */
+typedef enum {
+  pil_COORD_X = 0,
+  pil_COORD_Y = 1,
+  pil_COORD_ANGLE = 2
+} pil_coord;
+pil_element *pil_add_link(pil_world *w, pil_body *a, pil_coord ca, pil_body *b,
+                          pil_coord cb, double ratio);
 /* Rigidly join two bodies at a point (pin + fixed relative angle)
  * Returns pin */
 pil_element *pil_add_weld(pil_world *w, pil_anchor a, pil_anchor b);
-/* Unilateral contact (penalty + regularised Coulomb friction) between the
- * corners / rim of `body` and a line attached to `surface` (NULL = world),
- * given by a point and direction in surface frame
+/* Unilateral contact (penalty + regularised Coulomb friction) between corners /
+ * rim of `body` and a line attached to `surface` (NULL = world), given by a
+ * point and direction in surface frame
  * Body must be on left of direction
  * Use for blocks on wedges, cylinders on floors, dropped objects
  * Equal and opposite forces act on `surface` */
@@ -318,7 +330,7 @@ pil_deco *pil_add_angle_between(pil_world *w, pil_anchor center, pil_anchor p1,
 pil_deco *pil_add_ground(pil_world *w, pil_vec2 a, pil_vec2 b);
 /* Small "g" arrow in corner of textbook figures */
 pil_deco *pil_add_gravity_indicator(pil_world *w, pil_vec2 at);
-/* "g (x)": gravity pointing into the page (plan-view figures) */
+/* "g (x)": gravity pointing into page (plan-view figures) */
 pil_deco *pil_add_gravity_into_page(pil_world *w, pil_vec2 at);
 /* Arc from world angle `ref_angle` to live angle of `body` */
 pil_deco *pil_add_angle_marker(pil_world *w, pil_anchor center,
@@ -330,6 +342,26 @@ void pil_deco_hide(pil_deco *d);
 typedef void (*pil_overlay_fn)(struct _cairo *cr, const pil_view *view,
                                void *user);
 void pil_world_add_overlay(pil_world *w, pil_overlay_fn fn, void *user);
+
+/* Plot panel: curves of any quantity of world against time, drawn in a
+ * rectangle of figure (fractions of canvas, origin top-left)
+ * Whole curve is computed up front by pil_plot_record(), then a cursor follows
+ * animation mechanism
+ * At most 6 signals per plot */
+typedef struct pil_plot pil_plot;
+typedef double (*pil_signal_fn)(const pil_world *w, void *user);
+pil_plot *pil_add_plot(pil_world *w, double x0, double y0, double x1, double y1,
+                       const char *xlabel, const char *ylabel, double t_span);
+void pil_plot_add_signal(pil_plot *p, const char *label, pil_signal_fn fn,
+                         void *user);
+/* Run world from its current state for t_span (sampling every `sample_dt`,
+ * integrating with steps <= max_dt), fill every plot, then restore state */
+void pil_plots_record(pil_world *w, double sample_dt, double max_dt);
+/* Read back recorded data (e.g. to export a CSV): sample count, time and value
+ * of signal `sig` at sample `k` */
+int pil_plot_samples(const pil_plot *p);
+double pil_plot_time(const pil_plot *p, int k);
+double pil_plot_value(const pil_plot *p, int sig, int k);
 
 #ifdef __cplusplus
 }

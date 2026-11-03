@@ -23,6 +23,7 @@ typedef enum {
   EL_ROT_DRIVE,
   EL_ROLLING,
   EL_CIRCLE_ROLL,
+  EL_LINK,
   EL_PULLEY,
   EL_FLOOR
 } pil_el_kind;
@@ -31,22 +32,23 @@ struct pil_element {
   pil_el_kind kind;
   pil_world *world;
   pil_anchor a, b;
-  double k, rest, c;   /* spring / damper / torsion parameters        */
-  double length;       /* distance constraint                         */
-  double phase;        /* fixed angle / drive phase / rolling offset  */
-  double mu;           /* floor friction coefficient                  */
-  double radius2, ref; /* circle rolling: track radius, reference angle */
-  int sigma;           /* circle rolling: -1 inside the track, +1 outside */
-  double omega;        /* drive rate                                  */
-  pil_vec2 dir;        /* slot direction (unit, in B local frame)     */
-  pil_vec2 p1, p2;     /* pulley rope: fixed tangent points            */
-  pil_vec2 f;          /* constant force                              */
+  double k, rest, c;   /* spring / damper / torsion parameters           */
+  double length;       /* distance constraint                            */
+  double phase;        /* fixed angle / drive phase / rolling offset     */
+  double mu;           /* floor friction coefficient                     */
+  int ca, cb;          /* link: coordinate of a / b (pil_coord)          */
+  double radius2, ref; /* circle rolling: track radius, reference angle  */
+  int sigma;           /* circle rolling: -1 inside track, +1 outside    */
+  double omega;        /* drive rate                                     */
+  pil_vec2 dir;        /* slot direction (unit, in B local frame)        */
+  pil_vec2 p1, p2;     /* pulley rope: fixed tangent points              */
+  pil_vec2 f;          /* constant force                                 */
   unsigned flags;
   pil_force_fn fn;
   void *user;
   pil_terrain *terrain;
   double radius;
-  int rope_off; /* set by solver when a rope goes slack */
+  int rope_off; /* set by solver when a rope goes slack           */
   double last_force;
   /* drawing */
   int hidden;
@@ -106,6 +108,24 @@ typedef struct {
   double target;
 } pil_rowrec;
 
+typedef struct {
+  char label[48];
+  pil_signal_fn fn;
+  void *user;
+  double *v; /* samples, one per entry of plot's time axis */
+} pil_signal;
+
+#define PIL_PLOT_MAX_SIGNALS 6
+struct pil_plot {
+  double x0, y0, x1, y1; /* canvas fractions, origin top-left          */
+  char xlabel[32], ylabel[32];
+  double span; /* time axis runs 0 .. span                              */
+  pil_signal sig[PIL_PLOT_MAX_SIGNALS];
+  int nsig;
+  double *t;
+  int n, cap;
+};
+
 struct pil_world {
   pil_body **bodies;
   int nbodies, bcap, ndyn;
@@ -115,6 +135,8 @@ struct pil_world {
   int ndecos, dcap;
   pil_terrain **terrains;
   int nterr, tcap;
+  pil_plot **plots;
+  int nplots, plcap;
   pil_overlay *overlays;
   int noverlays, ocap;
   pil_vec2 g;
@@ -178,7 +200,10 @@ static inline int pil_isdyn(const pil_body *b) { return b && b->dof >= 0; }
 
 /* solver.c */
 void pil_compute_accel(pil_world *w);
+/* plot.c */
+void pil_plots_free(pil_world *w);
 /* inelastic velocity impulse when a rope snaps taut while still extending
  * (called after each step) */
+void pil_project_rope_snaps(pil_world *w);
 
 #endif

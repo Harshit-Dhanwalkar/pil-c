@@ -38,9 +38,10 @@ typedef struct {
   int draw_background;
   int text_halo; /* paper-coloured outline behind labels (readable over lines)
                   */
-  int show_com;  /* draw centre-of-mass symbol                 */
-  int spring_coils;   /* default number of coils                    */
-  double spring_w_px; /* default coil half-width in px              */
+  int show_com;       /* draw centre-of-mass symbol                     */
+  int spring_coils;   /* default number of coils                        */
+  int upright;        /* set: Latin text in upright face (plot numbers) */
+  double spring_w_px; /* default coil half-width in px                  */
   double hinge_r_px;
 } pil_style;
 
@@ -48,6 +49,11 @@ pil_style pil_style_textbook(void);
 
 void pil_view_fit(pil_view *v, double xmin, double ymin, double xmax,
                   double ymax, double width, double height, double margin_px);
+/* Like pil_view_fit, but fits box into a sub-rectangle of canvas (fractions,
+ * origin top-left) */
+void pil_view_fit_region(pil_view *v, double xmin, double ymin, double xmax,
+                         double ymax, double width, double height, double fx0,
+                         double fy0, double fx1, double fy1, double margin_px);
 pil_vec2 pil_view_to_screen(const pil_view *v, pil_vec2 world);
 pil_vec2 pil_view_to_world(const pil_view *v, pil_vec2 screen);
 

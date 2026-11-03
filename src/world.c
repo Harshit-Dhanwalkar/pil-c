@@ -290,6 +290,7 @@ void pil_world_free(pil_world *w) {
   for (int i = 0; i < w->nterr; i++) {
     free(w->terrains[i]);
   }
+  pil_plots_free(w);
   free(w->bodies);
   free(w->els);
   free(w->decos);

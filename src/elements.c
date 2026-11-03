@@ -42,6 +42,23 @@ pil_vec2 pil_anchor_vel(pil_anchor a) {
 
 static double a_omega(pil_anchor a) { return a.body ? a.body->omega : 0.0; }
 
+// one coordinate (x, y, angle) of a body and its rate; world has 0
+static double coord_q(const pil_body *b, int c) {
+  if (!b) {
+    return 0.0;
+  }
+
+  return c == pil_COORD_X ? b->pos.x : (c == pil_COORD_Y ? b->pos.y : b->angle);
+}
+
+static double coord_v(const pil_body *b, int c) {
+  if (!b) {
+    return 0.0;
+  }
+
+  return c == pil_COORD_X ? b->vel.x : (c == pil_COORD_Y ? b->vel.y : b->omega);
+}
+
 // Creation
 static pil_element *new_el(pil_world *w, pil_el_kind k) {
   pil_element *e = calloc(1, sizeof *e);
@@ -55,6 +72,20 @@ static pil_element *new_el(pil_world *w, pil_el_kind k) {
   e->label_dy = 0;
   GROW(w->els, w->nels, w->ecap);
   w->els[w->nels++] = e;
+
+  return e;
+}
+
+pil_element *pil_add_link(pil_world *w, pil_body *a, pil_coord ca, pil_body *b,
+                          pil_coord cb, double ratio) {
+  pil_element *e = new_el(w, EL_LINK);
+  e->a.body = a;
+  e->b.body = b;
+  e->ca = ca;
+  e->cb = cb;
+  e->k = ratio;
+  e->phase = coord_q(a, ca) - ratio * coord_q(b, cb);
+  e->hidden = 1;
 
   return e;
 }
@@ -341,6 +372,8 @@ void pil_elements_rebase(pil_world *w) {
       double D = e->radius2 + e->sigma * e->radius;
       e->ref = atan2(dl.y, dl.x);
       e->phase = D * e->ref + e->sigma * e->radius * (thb - thr);
+    } else if (e->kind == EL_LINK) {
+      e->phase = coord_q(e->a.body, e->ca) - e->k * coord_q(e->b.body, e->cb);
     } else if (e->kind == EL_ROLLING) {
       pil_body *b = e->a.body;
       pil_vec2 C = pil_anchor_world(e->a);
@@ -718,6 +751,17 @@ int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
     rows[0].vel = a_omega(e->a) - a_omega(e->b);
     rows[0].ja[2] = 1;
     rows[0].jb[2] = -1;
+    finish(e, &rows[0], 0.0);
+
+    return 1;
+  }
+
+  case EL_LINK: {
+    rows[0].phi =
+        coord_q(e->a.body, e->ca) - e->k * coord_q(e->b.body, e->cb) - e->phase;
+    rows[0].vel = coord_v(e->a.body, e->ca) - e->k * coord_v(e->b.body, e->cb);
+    rows[0].ja[e->ca] = 1;
+    rows[0].jb[e->cb] = -e->k;
     finish(e, &rows[0], 0.0);
 
     return 1;

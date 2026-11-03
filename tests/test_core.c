@@ -397,6 +397,42 @@ static void test_rope_snap(void) {
   pil_world_free(w);
 }
 
+static double sig_y(const pil_world *w, void *user) {
+  (void)w;
+
+  return ((pil_body *)user)->pos.y;
+}
+
+static void test_link_and_plot(void) {
+  puts("linear link (effective inertia) and plot recording");
+  pil_world *w = pil_world_new();
+  pil_world_set_gravity(w, 0, -9.81);
+  double ma = 1.0, mb = 0.5, ratio = -2.0;
+  pil_body *a = pil_add_body(
+      w,
+      &(pil_body_desc){.shape = pil_rect(0.2, 0.2), .mass = ma, .pos = {0, 5}});
+  pil_body *b = pil_add_body(
+      w,
+      &(pil_body_desc){.shape = pil_rect(0.2, 0.2), .mass = mb, .pos = {1, 0}});
+  pil_add_prismatic(w, pil_on(a, 0, 0), pil_at(0, 0), (pil_vec2){0, 1});
+  pil_add_prismatic(w, pil_on(b, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
+  // b.x = ratio * a.y + const: b moves |ratio| times as far as a drops
+  pil_add_link(w, b, pil_COORD_X, a, pil_COORD_Y, ratio);
+  pil_plot *p = pil_add_plot(w, 0.5, 0.5, 1, 1, "t [s]", "y", 1.0);
+  pil_plot_add_signal(p, "y", sig_y, a);
+  pil_plots_record(w, 0.1, 1e-3);
+  check("recording leaves the state untouched", a->pos.y, 5.0, 1e-12);
+  check("recording rewinds the clock", pil_world_time(w), 0.0, 1e-12);
+  // Effective mass ma + ratio^2 mb: a_y = -g ma / (ma + ratio^2 mb)
+  double acc = 9.81 * ma / (ma + ratio * ratio * mb);
+  check("plot sample at t = 1 s (y = 5 - acc/2)", pil_plot_value(p, 0, 10),
+        5.0 - 0.5 * acc, 2e-4);
+  pil_world_advance(w, 1.0, 5e-4);
+  check("fall with effective inertia", a->pos.y, 5.0 - 0.5 * acc, 2e-4);
+  check("follower moves 2x", b->pos.x - 1.0, ratio * (a->pos.y - 5.0), 1e-6);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -412,6 +448,7 @@ int main(void) {
   test_ball_over_cylinder();
   test_weld();
   test_rope_snap();
+  test_link_and_plot();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

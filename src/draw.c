@@ -7,6 +7,7 @@
 
 #include "pil/pil_draw.h"
 #include "pil_internal.h"
+#include "plot.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +44,21 @@ void pil_view_fit(pil_view *v, double x0, double y0, double x1, double y1,
   v->scale = sx < sy ? sx : sy;
   v->cx = 0.5 * (x0 + x1);
   v->cy = 0.5 * (y0 + y1);
+  v->width = W;
+  v->height = H;
+}
+
+void pil_view_fit_region(pil_view *v, double x0, double y0, double x1,
+                         double y1, double W, double H, double fx0, double fy0,
+                         double fx1, double fy1, double margin) {
+  double rw = (fx1 - fx0) * W;
+  double rh = (fy1 - fy0) * H;
+  pil_view_fit(v, x0, y0, x1, y1, rw, rh, margin);
+  // box is centred in region; recentre view on whole canvas
+  double rcx = (fx0 + fx1) * 0.5 * W;
+  double rcy = (fy0 + fy1) * 0.5 * H;
+  v->cx -= (rcx - 0.5 * W) / v->scale;
+  v->cy += (rcy - 0.5 * H) / v->scale;
   v->width = W;
   v->height = H;
 }
@@ -185,9 +201,12 @@ static double text_chunk(cairo_t *cr, const pil_style *st, const char *s, int n,
     }
 
     if (j > i) {
-      x += text_piece(cr, st, st->font, CAIRO_FONT_SLANT_ITALIC, s + i, j - i,
-                      x, y, size, draw);
+      x += text_piece(cr, st, st->font,
+                      st->upright ? CAIRO_FONT_SLANT_NORMAL
+                                  : CAIRO_FONT_SLANT_ITALIC,
+                      s + i, j - i, x, y, size, draw);
     }
+
     if (j < n) {
       int l = utf8_len((unsigned char)s[j]);
       char g[8];
@@ -196,6 +215,7 @@ static double text_chunk(cairo_t *cr, const pil_style *st, const char *s, int n,
                       y, size, draw);
       j += l;
     }
+
     i = j;
   }
 
@@ -921,9 +941,14 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
               0); // sits on body: no halo
   }
 
+  for (int i = 0; i < w->nplots; i++) {
+    pil_plot_draw(cr, w->plots[i], w, v, st);
+  }
+
   for (int i = 0; i < w->noverlays; i++) {
     w->overlays[i].fn(cr, v, w->overlays[i].user);
   }
+
   cairo_restore(cr);
 }
 
