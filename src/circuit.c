@@ -81,7 +81,7 @@ void pil_wire(pil_circuit *c, pil_node a, pil_node b) {
   }
 
   c->wires = grow(c->wires, c->nw + 1, &c->wcap, sizeof *c->wires);
-  c->wires[c->nw++] = (pil_cwire){a, b};
+  c->wires[c->nw++] = (pil_cwire){.a = a, .b = b};
 }
 
 static pil_celement *new_el(pil_circuit *c, pil_ce_kind k, pil_node a,
@@ -311,7 +311,91 @@ static double limit_diode(double vnew, double vold, double nvt, double vcrit) {
   return vnew;
 }
 
-static void step_once(pil_circuit *c, double h) {
+// Assign wire currents from KCL. Element currents give external injection at
+// each raw node; wires distribute flow through wire graph (assumed to be a
+// forest; cycle edges get i = 0)
+static void compute_wire_currents(pil_circuit *c) {
+  int nn = c->nn;
+  for (int k = 0; k < c->nw; k++) {
+    c->wires[k].i = 0;
+  }
+  if (nn == 0 || c->nw == 0) {
+    return;
+  }
+
+  double *ext = calloc(nn, sizeof *ext);
+  double *acc = calloc(nn, sizeof *acc);
+  int *pn = malloc(nn * sizeof *pn);
+  int *pw = malloc(nn * sizeof *pw);
+  int *bfs = malloc(nn * sizeof *bfs);
+  char *seen = calloc(nn, 1);
+  if (!ext || !acc || !pn || !pw || !bfs || !seen) {
+    free(ext);
+    free(acc);
+    free(pn);
+    free(pw);
+    free(bfs);
+    free(seen);
+    return;
+  }
+
+  // External current leaving each raw node
+  for (int k = 0; k < c->ne; k++) {
+    const pil_celement *e = c->els[k];
+    ext[e->a] += e->i;
+    ext[e->b] -= e->i;
+  }
+
+  for (int start = 0; start < nn; start++) {
+    if (seen[start]) {
+      continue;
+    }
+
+    int qh = 0, qt = 0;
+    bfs[qt++] = start;
+    seen[start] = 1;
+    pn[start] = -1;
+    pw[start] = -1;
+
+    while (qh < qt) {
+      int u = bfs[qh++];
+      for (int k = 0; k < c->nw; k++) {
+        int wa = c->wires[k].a, wb = c->wires[k].b;
+        int other = (wa == u) ? wb : ((wb == u) ? wa : -1);
+        if (other < 0 || seen[other]) {
+          continue;
+        }
+        seen[other] = 1;
+        pn[other] = u;
+        pw[other] = k;
+        bfs[qt++] = other;
+      }
+    }
+
+    // Reverse BFS: leaves first
+    // F(u) = current leaving subtree u via its parent wire
+    // KCL at u:  ext[u] + \sum F(children) - F(u) = 0
+    for (int i = qt - 1; i >= 0; i--) {
+      int u = bfs[i];
+      double Fu = -ext[u] + acc[u];
+      if (pw[u] >= 0) {
+        int wk = pw[u], p = pn[u];
+        int wa = c->wires[wk].a;
+        c->wires[wk].i = (wa == u) ? Fu : -Fu;
+        acc[p] += Fu;
+      }
+    }
+  }
+
+  free(ext);
+  free(acc);
+  free(pn);
+  free(pw);
+  free(bfs);
+  free(seen);
+}
+
+static int step_once(pil_circuit *c, double h) {
   const double t1 = c->t + h;
   const double th = c->first ? 1.0 : c->theta;
   const double carry = (1.0 - th) / th;
@@ -366,6 +450,7 @@ static void step_once(pil_circuit *c, double h) {
 #define IB(e) (idx[pil_cnode_find(c, (e)->b)])
 #define AT(i, j) A[(size_t)(i) * N + (j)]
 
+  int newton_ok = 0;
   int iter = 0;
   for (;; iter++) {
     memset(A, 0, (size_t)N * N * sizeof *A);
@@ -393,10 +478,21 @@ static void step_once(pil_circuit *c, double h) {
         break;
       }
       case CE_DIODE: {
-        double ex = exp(fmin(e->vd / e->n_vt, 80.0));
+        double vd_c = e->vd;
+        if (vd_c > 0.9) {
+          vd_c = 0.9;
+        }
+        if (vd_c < -20.0) {
+          vd_c = -20.0;
+        }
+
+        double ex = exp(fmin(vd_c / e->n_vt, 80.0));
         double id = e->is * (ex - 1.0);
         G = e->is * ex / e->n_vt + GMIN;
-        Ik = id - G * e->vd;
+        if (G > 1e6) {
+          G = 1e6;
+        }
+        Ik = id - G * vd_c;
         break;
       }
       case CE_ISOURCE: {
@@ -452,10 +548,12 @@ static void step_once(pil_circuit *c, double h) {
     }
 
     if (!solve_dense(A, rhs, N)) {
-      break; // singular: keep previous state
+      newton_ok = 0; // singular: keep previous state
+      break;
     }
 
     if (!has_diode) {
+      newton_ok = 1;
       break;
     }
 
@@ -477,7 +575,12 @@ static void step_once(pil_circuit *c, double h) {
       e->vd = vn;
     }
 
-    if (converged || iter >= 99) {
+    if (converged) {
+      newton_ok = 1;
+      break;
+    }
+    if (iter >= 99) {
+      newton_ok = 0;
       break;
     }
   }
@@ -515,9 +618,19 @@ static void step_once(pil_circuit *c, double h) {
       break;
     }
     case CE_DIODE: {
-      double ex = exp(fmin(e->vd / e->n_vt, 80.0));
+      double vd_c = e->vd;
+      if (vd_c > 1.5) {
+        vd_c = 1.5;
+      }
+      if (vd_c < -20.0) {
+        vd_c = -20.0;
+      }
+      double ex = exp(fmin(vd_c / e->n_vt, 80.0));
       double g = e->is * ex / e->n_vt + GMIN;
-      i = e->is * (ex - 1.0) + g * (v - e->vd);
+      if (g > 1e6) {
+        g = 1e6;
+      }
+      i = e->is * (ex - 1.0) + g * (v - vd_c);
       break;
     }
     case CE_ISOURCE: {
@@ -533,6 +646,27 @@ static void step_once(pil_circuit *c, double h) {
 
     e->v = v;
     e->i = i;
+    e->anim_phase += i * h;
+    // A single bad step should not dominate the animation for the rest of run -
+    // if accumulated charge is absurd, reset it
+    if (fabs(e->anim_phase) > 1e3) {
+      e->anim_phase = 0;
+    }
+    if (fabs(i) > c->peak_i) {
+      c->peak_i = fabs(i);
+    }
+    if (c->peak_i > 1e3) {
+      // Solver transient: don't scale dots to it
+      c->peak_i = 0;
+    }
+  }
+
+  compute_wire_currents(c);
+  for (int k = 0; k < c->nw; k++) {
+    c->wires[k].anim_phase += c->wires[k].i * h;
+    if (fabs(c->wires[k].anim_phase) > 1e3) {
+      c->wires[k].anim_phase = 0;
+    }
   }
 
 #undef IA
@@ -543,6 +677,8 @@ static void step_once(pil_circuit *c, double h) {
 
   c->t = t1;
   c->first = 0;
+
+  return newton_ok ? 0 : 1;
 }
 
 static void circuit_step(pil_circuit *c, double dt) {
@@ -555,7 +691,12 @@ static void circuit_step(pil_circuit *c, double dt) {
   // negligible, then continue with chosen \theta
   if (c->first) {
     double h0 = fmin(c->max_h * 1e-3, 0.5 * dt);
-    step_once(c, h0);
+    // if (step_once(c, h0) != 0) {
+    //   // First step failed - skip it, keep going
+    // } else {
+    //   dt -= h0;
+    // }
+    step_once(c, h0); // ignore status on first step
     dt -= h0;
   }
 
@@ -563,6 +704,22 @@ static void circuit_step(pil_circuit *c, double dt) {
   if (n < 1) {
     n = 1;
   }
+
+  // double h = dt / n;
+  //
+  // for (int s = 0; s < n; s++) {
+  //   double hs = h;
+  //   int tries = 0;
+  //   while (step_once(c, hs) != 0) {
+  //     // Save state, roll back and retry with half step
+  //     pil_celement_state_save(c); // snapshot v, i, vd, vn, t, first
+  //     hs *= 0.5;
+  //     if (++tries >= 8) {
+  //       pil_celement_state_restore(c); // give up, keep previous state
+  //       break;
+  //     }
+  //   }
+  // }
 
   for (int s = 0; s < n; s++) {
     step_once(c, dt / n);
@@ -573,11 +730,18 @@ static void circuit_reset(pil_circuit *c) {
   c->t = 0;
   c->first = 1;
   c->newton_iters = 0;
+  c->peak_i = 0;
   for (int k = 0; k < c->ne; k++) {
     pil_celement *e = c->els[k];
     e->v = e->kind == CE_CAPACITOR ? e->init : 0.0;
     e->i = e->kind == CE_INDUCTOR ? e->init : 0.0;
+    e->anim_phase = 0;
     e->vd = 0;
+  }
+
+  for (int k = 0; k < c->nw; k++) {
+    c->wires[k].i = 0;
+    c->wires[k].anim_phase = 0;
   }
 
   free(c->vn);

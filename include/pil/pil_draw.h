@@ -43,6 +43,8 @@ typedef struct {
   int upright;        /* set: Latin text in upright face (plot numbers) */
   double spring_w_px; /* default coil half-width in px                  */
   double hinge_r_px;
+  int show_current;         /* draw moving current dots on circuit branches */
+  double current_dot_speed; /* px per amp-second of sim time        */
 } pil_style;
 
 pil_style pil_style_textbook(void);

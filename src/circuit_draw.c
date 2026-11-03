@@ -8,8 +8,7 @@
  * Each element is drawn along straight line between its two nodes: wire, symbol
  * centred on line, wire
  * Everything is in screen pixels so symbols keep their size when figure is
- * zoomed
- */
+ * zoomed */
 
 #include "pil_circuit_draw.h"
 #include <cairo.h>
@@ -169,6 +168,50 @@ static double symbol_length(const pil_celement *e) {
   return 40;
 }
 
+static void draw_current_dots(cairo_t *cr, pil_vec2 a, pil_vec2 b,
+                              double phase_px, double skip_mid,
+                              const pil_style *st) {
+  double dx = b.x - a.x;
+  double dy = b.y - a.y;
+  double L = hypot(dx, dy);
+  if (L < 10) {
+    return;
+  }
+
+  double ux = dx / L;
+  double uy = dy / L;
+  double mid_lo = (L - skip_mid) * 0.5;
+  double mid_hi = mid_lo + skip_mid;
+  const double spacing = 20.0;
+  double off = fmod(phase_px, spacing);
+  if (off < 0) {
+    off += spacing;
+  }
+
+  cairo_save(cr);
+  cairo_set_source_rgb(cr, st->ink[0], st->ink[1], st->ink[2]);
+  for (double s = off; s < L; s += spacing) {
+    if (s >= mid_lo && s < mid_hi) {
+      continue; // skip symbol
+    }
+
+    double x = a.x + ux * s;
+    double y = a.y + uy * s;
+
+    // paper-coloured halo
+    cairo_arc(cr, x, y, 3.2, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, st->paper[0], st->paper[1], st->paper[2]);
+    cairo_fill(cr);
+
+    // ink dot inside halo
+    cairo_arc(cr, x, y, 1.9, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, st->ink[0], st->ink[1], st->ink[2]);
+    cairo_fill(cr);
+  }
+
+  cairo_restore(cr);
+}
+
 static void draw_ground(cairo_t *cr, pil_vec2 p, const pil_style *st) {
   cairo_set_line_width(cr, st->line_w);
   line(cr, p.x, p.y, p.x, p.y + 10);
@@ -190,16 +233,26 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     abort();
   }
 
+  double anim_scale = (c->peak_i > 1e-12 && st->current_dot_speed > 0)
+                          ? st->current_dot_speed / c->peak_i
+                          : 0;
+
   for (int k = 0; k < c->nw; k++) {
-    pil_vec2 a = node_px(c, v, c->wires[k].a), b = node_px(c, v, c->wires[k].b);
+    pil_vec2 a = node_px(c, v, c->wires[k].a);
+    pil_vec2 b = node_px(c, v, c->wires[k].b);
     line(cr, a.x, a.y, b.x, b.y);
     deg[c->wires[k].a]++;
     deg[c->wires[k].b]++;
+
+    if (st->show_current && anim_scale > 0 && fabs(c->wires[k].i) > 1e-9) {
+      draw_current_dots(cr, a, b, c->wires[k].anim_phase * anim_scale, 0, st);
+    }
   }
 
   for (int k = 0; k < c->ne; k++) {
     const pil_celement *e = c->els[k];
-    pil_vec2 a = node_px(c, v, e->a), b = node_px(c, v, e->b);
+    pil_vec2 a = node_px(c, v, e->a);
+    pil_vec2 b = node_px(c, v, e->b);
     deg[e->a]++;
     deg[e->b]++;
     double L = hypot(b.x - a.x, b.y - a.y);
@@ -213,12 +266,17 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     pil_vec2 m = {0.5 * (a.x + b.x), 0.5 * (a.y + b.y)};
     line(cr, a.x, a.y, m.x - ux * sl / 2, m.y - uy * sl / 2);
     line(cr, m.x + ux * sl / 2, m.y + uy * sl / 2, b.x, b.y);
+
     if (!e->hidden) {
       cairo_save(cr);
       cairo_translate(cr, m.x, m.y);
       cairo_rotate(cr, atan2(uy, ux));
       symbol(cr, e, sl, st, c->world->t);
       cairo_restore(cr);
+    }
+
+    if (anim_scale > 0 && fabs(e->i) > 1e-9) {
+      draw_current_dots(cr, a, b, e->anim_phase * anim_scale, sl, st);
     }
 
     if (e->label[0] && !e->hidden) {

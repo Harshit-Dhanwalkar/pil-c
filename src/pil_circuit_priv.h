@@ -40,6 +40,7 @@ struct pil_celement {
   char label[32];
   double label_dx, label_dy;
   int hidden;
+  double anim_phase; /* \int i dt — drives current-dot motion */
 };
 
 typedef struct {
@@ -49,6 +50,8 @@ typedef struct {
 
 typedef struct {
   pil_node a, b;
+  double i;          /* current a -> b, from KCL pass                        */
+  double anim_phase; /* \int i dt for dot animation                          */
 } pil_cwire;
 
 struct pil_circuit {
@@ -67,6 +70,7 @@ struct pil_circuit {
   /* scratch */
   double *A, *rhs, *x;
   int scap;
+  double peak_i; /* running maximum |i|, for stable dot speed */
 };
 
 int pil_cnode_find(const pil_circuit *c, int n);

@@ -34,6 +34,8 @@ pil_style pil_style_textbook(void) {
   s.spring_coils = 7;
   s.spring_w_px = 10.0;
   s.hinge_r_px = 3.6;
+  s.show_current = 1;
+  s.current_dot_speed = 20000.0;
 
   return s;
 }
@@ -42,6 +44,7 @@ void pil_view_fit(pil_view *v, double x0, double y0, double x1, double y1,
                   double W, double H, double margin) {
   double sx = (W - 2 * margin) / (x1 - x0);
   double sy = (H - 2 * margin) / (y1 - y0);
+
   v->scale = sx < sy ? sx : sy;
   v->cx = 0.5 * (x0 + x1);
   v->cy = 0.5 * (y0 + y1);
@@ -54,10 +57,12 @@ void pil_view_fit_region(pil_view *v, double x0, double y0, double x1,
                          double fx1, double fy1, double margin) {
   double rw = (fx1 - fx0) * W;
   double rh = (fy1 - fy0) * H;
+
   pil_view_fit(v, x0, y0, x1, y1, rw, rh, margin);
   // box is centred in region; recentre view on whole canvas
   double rcx = (fx0 + fx1) * 0.5 * W;
   double rcy = (fy0 + fy1) * 0.5 * H;
+
   v->cx -= (rcx - 0.5 * W) / v->scale;
   v->cy += (rcy - 0.5 * H) / v->scale;
   v->width = W;
