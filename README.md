@@ -1,4 +1,5 @@
 # Physics Illustration library in C (pil-c)
+
 A small C99 library that simulates 2D mechanical systems and draws them the way
 a textbook does: grey bodies, coil springs, dashpots, hatched ground, hinges,
 dimension lines, italic serif labels with `x_1`-style subscripts and Greek
@@ -23,15 +24,23 @@ interactive window.
     <td align="center"><img src="docs/assets/frame.gif" width="200"><br><b>Sliding frame with two sprung blocks, a two-link arm with a torsion knee, a sprung link and k4 spring to the wall</b></td>
     <td align="center"><img src="docs/assets/ring.gif" width="200"><br><b>Two blocks with pendulums</b></td>
   </tr>
+  <!-- <tr> -->
+  <!--   <td align="center"><img src="docs/assets/pulleys.gif" width="200"><br><b>     </b></td> -->
+  <!--   <td align="center"><img src="docs/assets/swing.gif" width="200"><br><b>   </b></td> -->
+  <!-- </tr> -->
+  <!-- <tr> -->
+  <!--   <td align="center"><img src="docs/assets/rectfier.gif" width="200"><br><b>     </b></td> -->
+  <!--   <td align="center"><img src="docs/assets/rlc.gif" width="200"><br><b>   </b></td> -->
+  <!-- </tr> -->
 </table>
 
-
 ## Features
-*   **Rigid Body Dynamics:** Full 2D translation and rotation with impulse-based constraints.
-*   **Textbook Renderer:** Cairo-powered backend that draws perfect hatching, zig-zag springs, dashpots, and LaTeX-style labels.
-*   **Drop-in Elements:** Springs, dampers, pulleys, ropes, slots, and terrain contacts.
-*   **Interactive:** Built-in SDL2 window for live simulation (grab bodies with your mouse, pause, step, and change gravity).
-*   **Export:** Output directly to `.png`, `.svg`, or record `.gif`/`.mp4` animations via `ffmpeg`.
+
+- **Rigid Body Dynamics:** Full 2D translation and rotation with impulse-based constraints.
+- **Textbook Renderer:** Cairo-powered backend that draws perfect hatching, zig-zag springs, dashpots, and LaTeX-style labels.
+- **Drop-in Elements:** Springs, dampers, pulleys, ropes, slots, and terrain contacts.
+- **Interactive:** Built-in SDL2 window for live simulation (grab bodies with your mouse, pause, step, and change gravity).
+- **Export:** Output directly to `.png`, `.svg`, or record `.gif`/`.mp4` animations via `ffmpeg`.
 
 ## Build
 
@@ -44,7 +53,7 @@ sudo make install        # headers, libpil.a, pil.pc
 ```
 
 Use it from your own program with `cc prog.c $(pkg-config --cflags --libs pil)`.
-Text uses *Latin Modern* (Roman + Math) if installed, as it is with $\TeX$ Live.
+Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 
 ## Try it
 
@@ -61,10 +70,14 @@ Text uses *Latin Modern* (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/frame
 ./build/incline
 ./build/ring
+./build/pulleys
+./build/swing
+./build/rectfier
+./build/rlc
 ```
 
 Window keys: `space` pause · `r` reset · `→` step · `+`/`-` speed · `p`/`f`/`g` save
-PNG/PDF/SVG · `h` HUD · `esc`.  Mouse: left-drag pulls a body, wheel zooms,
+PNG/PDF/SVG · `h` HUD · `esc`. Mouse: left-drag pulls a body, wheel zooms,
 right-drag pans.
 
 ## A complete program
@@ -98,43 +111,43 @@ int main(void)
 
 ## Concepts
 
-* **Bodies** have a shape (`pil_rect`, `pil_disc`, `pil_point_mass`, `pil_poly`,
+- **Bodies** have a shape (`pil_rect`, `pil_disc`, `pil_point_mass`, `pil_poly`,
   `pil_arc_band`), mass, inertia (computed from the shape if you give 0), a state,
-  and flags (`PIL_STATIC`, `PIL_SPOKE`, `PIL_HIDDEN`, ...).  `pos` is the centre of mass.
+  and flags (`PIL_STATIC`, `PIL_SPOKE`, `PIL_HIDDEN`, ...). `pos` is the centre of mass.
   For polygons and arc bands the shape is re-centred on its centroid automatically.
-* **Anchors** say *where* an element attaches: `pil_on(body, lx, ly)` is a point fixed
-  in a body, `pil_at(x, y)` is a point fixed in the world.  Every element takes anchors.
-* **Elements** are what you drop in.  Force elements add forces; constraints remove
+- **Anchors** say _where_ an element attaches: `pil_on(body, lx, ly)` is a point fixed
+  in a body, `pil_at(x, y)` is a point fixed in the world. Every element takes anchors.
+- **Elements** are what you drop in. Force elements add forces; constraints remove
   degrees of freedom.
 
-| you want | call |
-|---|---|
-| spring / damper | `pil_add_spring`, `pil_add_damper` |
-| torsional spring (+damper) | `pil_add_torsion_spring` |
-| constant force / "pull" | `pil_add_force` |
-| any force law you like | `pil_add_custom_force(fn)` - call `pil_apply_force` inside |
-| pin / hinge | `pil_add_revolute` |
-| rigid rod / rope | `pil_add_distance(..., 0)` / `(..., PIL_ROPE)` |
-| rope over a pulley | `pil_add_pulley_rope` (+ a static disc body for the pulley) |
-| sliding guide, rail | `pil_add_slot`, `pil_add_prismatic` (slot + fixed angle) |
-| lock an angle / motor | `pil_add_fixed_angle`, `pil_add_rotation_drive` |
-| roll without slipping on a line | `pil_add_rolling` (discs, cylinders, arc bands) |
-| block/wedge/floor contact + friction | `pil_add_floor_contact` (line may belong to a moving body) |
-| uneven moving road | `pil_add_terrain` + `pil_add_terrain_contact` |
+| you want                             | call                                                        |
+| ------------------------------------ | ----------------------------------------------------------- |
+| spring / damper                      | `pil_add_spring`, `pil_add_damper`                          |
+| torsional spring (+damper)           | `pil_add_torsion_spring`                                    |
+| constant force / "pull"              | `pil_add_force`                                             |
+| any force law you like               | `pil_add_custom_force(fn)` - call `pil_apply_force` inside  |
+| pin / hinge                          | `pil_add_revolute`                                          |
+| rigid rod / rope                     | `pil_add_distance(..., 0)` / `(..., PIL_ROPE)`              |
+| rope over a pulley                   | `pil_add_pulley_rope` (+ a static disc body for the pulley) |
+| sliding guide, rail                  | `pil_add_slot`, `pil_add_prismatic` (slot + fixed angle)    |
+| lock an angle / motor                | `pil_add_fixed_angle`, `pil_add_rotation_drive`             |
+| roll without slipping on a line      | `pil_add_rolling` (discs, cylinders, arc bands)             |
+| block/wedge/floor contact + friction | `pil_add_floor_contact` (line may belong to a moving body)  |
+| uneven moving road                   | `pil_add_terrain` + `pil_add_terrain_contact`               |
 
-* **Annotations** (visual only): `pil_add_dimension`, `_label`, `_arrow`, `_line`,
-  `_angle_marker`, `_ground`, `_gravity_indicator`.  For anything else register an overlay
+- **Annotations** (visual only): `pil_add_dimension`, `_label`, `_arrow`, `_line`,
+  `_angle_marker`, `_ground`, `_gravity_indicator`. For anything else register an overlay
   with `pil_world_add_overlay` and draw with Cairo plus the public symbol primitives
   (`pil_draw_spring`, `pil_draw_dashpot`, `pil_draw_hinge`, `pil_draw_arrow`, `pil_draw_text`, ...).
-* **Text** understands `x_1`, `x_{12}`, `x^2` and UTF‑8 (`"\xcf\x86"` $\rightarrow$ φ).
+- **Text** understands `x_1`, `x_{12}`, `x^2` and UTF‑8 (`"\xcf\x86"` $\rightarrow$ φ).
 
 ## How it works
 
 Each body carries its own coordinates $(x, y, \theta)$ and every joint is an equation
-$\phi(q, t) = 0$.  With $J = \partial \phi/\partial q$, the motion is $M a + J^{T} \lambda = F$, $J a = \gamma$.
-Eliminating $a$ leaves a small dense system for the multipliers $\lambda$.  $\gamma$ includes the
+$\phi(q, t) = 0$. With $J = \partial \phi/\partial q$, the motion is $M a + J^{T} \lambda = F$, $J a = \gamma$.
+Eliminating $a$ leaves a small dense system for the multipliers $\lambda$. $\gamma$ includes the
 velocity-dependent terms and Baumgarte stabilisation, and the state is advanced
-with RK4. A new constraint therefore only has to supply $\phi$, $J$ and $\gamma$ - no equations of motion are derived per problem.  Ropes add a one-line active set (tension $\lambda \ge 0$, otherwise the rope is slack).
+with RK4. A new constraint therefore only has to supply $\phi$, $J$ and $\gamma$ - no equations of motion are derived per problem. Ropes add a one-line active set (tension $\lambda \ge 0$, otherwise the rope is slack).
 
 ## Tests
 
@@ -149,9 +162,10 @@ For a one-off, `pil_add_custom_force` needs no changes to the library. For a reu
 element: add a kind to `pil_el_kind` (`src/pil_internal.h`), a creator in `elements.c`,
 a case in `pil_element_apply` (force) or `pil_constraint_eval` (fill `phi`, `vel`, `ja`,
 `jb`, and `gamma` from the derivation `Φ̈ = J a − γ₀`), a case in `draw_element`, and a
-test in `tests/test_core.c`.  `EL_PULLEY` is a compact worked example of each step.
+test in `tests/test_core.c`. `EL_PULLEY` is a compact worked example of each step.
 
 # TODO
+
 - [ ] Make controller `w/a/s/d` to control actuator
 - [ ] Electrodynamics and circuits
 - [ ] Spinning 3D bodies (require quaternions and a 3D renderer)
@@ -159,7 +173,7 @@ test in `tests/test_core.c`.  `EL_PULLEY` is a compact worked example of each st
 - [ ] No body–body collision. Contact exists between a body and a line (`pil_add_floor_contact`).
 - [ ] Contacts are penalty springs: use `max_dt ≲ 5·10⁻⁴` with stiff contacts (default in the examples). A rope that snaps taut is smoothed by the stabilisation, not treated as an impulsive collision.
 - [ ] Mouse interaction in the window is covered by a unit test of the pick/grab physics and a
-  headless run of the window; to be exercised with a real pointer
+      headless run of the window; to be exercised with a real pointer
 
 ## License
 
