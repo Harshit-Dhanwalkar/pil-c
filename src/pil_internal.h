@@ -203,6 +203,7 @@ static inline int pil_isdyn(const pil_body *b) { return b && b->dof >= 0; }
 /* solver.c */
 void pil_compute_accel(pil_world *w);
 /* circuit.c (declared in pil_circuit_priv.h for circuit sources) */
+void pil_circuits_apply_forces(pil_world *w);
 void pil_circuits_step(pil_world *w, double dt);
 void pil_circuits_reset(pil_world *w);
 void pil_circuits_free(pil_world *w);

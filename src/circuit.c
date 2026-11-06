@@ -192,6 +192,36 @@ pil_celement *pil_switch(pil_circuit *c, pil_node a, pil_node b,
   return e;
 }
 
+static pil_celement *transducer(pil_circuit *c, pil_ce_kind k, pil_node a,
+                                pil_node b, pil_body *m, pil_body *m2,
+                                double kc, double r, double l,
+                                const char *label) {
+  pil_celement *e = new_el(c, k, a, b, label);
+  e->mb = m;
+  e->mb2 = m2;
+  e->kc = kc;
+  e->res = r;
+  e->value = l;
+
+  return e;
+}
+
+pil_celement *pil_motor(pil_circuit *c, pil_node a, pil_node b, pil_body *rotor,
+                        pil_body *stator, double kt, double r, double l,
+                        const char *label) {
+  return transducer(c, CE_MOTOR, a, b, rotor, stator, kt, r, l, label);
+}
+
+pil_celement *pil_voice_coil(pil_circuit *c, pil_node a, pil_node b,
+                             pil_body *mover, pil_body *base, pil_vec2 axis,
+                             double kf, double r, double l, const char *label) {
+  pil_celement *e = transducer(c, CE_VCOIL, a, b, mover, base, kf, r, l, label);
+  double n = hypot(axis.x, axis.y);
+  e->axis = n > 0 ? pil_v2(axis.x / n, axis.y / n) : pil_v2(1, 0);
+
+  return e;
+}
+
 void pil_celement_set_label_at(pil_celement *e, double dx_px, double dy_px) {
   e->label_dx = dx_px;
   e->label_dy = dy_px;
@@ -219,7 +249,8 @@ double pil_circuit_energy(const pil_circuit *c) {
     const pil_celement *e = c->els[k];
     if (e->kind == CE_CAPACITOR) {
       E += 0.5 * e->value * e->v * e->v;
-    } else if (e->kind == CE_INDUCTOR) {
+    } else if (e->kind == CE_INDUCTOR || e->kind == CE_MOTOR ||
+               e->kind == CE_VCOIL) {
       E += 0.5 * e->value * e->i * e->i;
     }
   }
@@ -421,8 +452,17 @@ static int step_once(pil_circuit *c, double h) {
   for (int k = 0; k < c->ne; k++) {
     pil_celement *e = c->els[k];
     e->branch = -1;
-    if (e->kind == CE_INDUCTOR || e->kind == CE_VSOURCE) {
+    if (e->kind == CE_INDUCTOR || e->kind == CE_VSOURCE ||
+        e->kind == CE_MOTOR || e->kind == CE_VCOIL) {
       e->branch = nv + nb++;
+    }
+
+    if (e->kind == CE_MOTOR) {
+      e->wm = e->mb->omega - (e->mb2 ? e->mb2->omega : 0.0);
+    } else if (e->kind == CE_VCOIL) {
+      pil_vec2 vb = e->mb2 ? e->mb2->vel : pil_v2(0, 0);
+      e->wm =
+          (e->mb->vel.x - vb.x) * e->axis.x + (e->mb->vel.y - vb.y) * e->axis.y;
     }
   }
 
@@ -513,6 +553,24 @@ static int step_once(pil_circuit *c, double h) {
 
         AT(e->branch, e->branch) -= Rq;
         rhs[e->branch] = -Rq * e->i - carry * e->v;
+        continue;
+      }
+      case CE_MOTOR:
+      case CE_VCOIL: {
+        // v = r i + l (i - i_n)/h + k w, backward Euler
+        double Rq = e->res + e->value / h;
+        if (ia >= 0) {
+          AT(ia, e->branch) += 1;
+          AT(e->branch, ia) += 1;
+        }
+
+        if (ib >= 0) {
+          AT(ib, e->branch) -= 1;
+          AT(e->branch, ib) -= 1;
+        }
+
+        AT(e->branch, e->branch) -= Rq;
+        rhs[e->branch] = -(e->value / h) * e->i + e->kc * e->wm;
         continue;
       }
       case CE_VSOURCE: {
@@ -638,7 +696,9 @@ static int step_once(pil_circuit *c, double h) {
       break;
     }
     case CE_INDUCTOR:
-    case CE_VSOURCE: {
+    case CE_VSOURCE:
+    case CE_MOTOR:
+    case CE_VCOIL: {
       i = rhs[e->branch];
       break;
     }
@@ -647,8 +707,8 @@ static int step_once(pil_circuit *c, double h) {
     e->v = v;
     e->i = i;
     e->anim_phase += i * h;
-    // A single bad step should not dominate the animation for the rest of run -
-    // if accumulated charge is absurd, reset it
+    // A single bad step should not dominate animation for rest of run - if
+    // accumulated charge is absurd, reset it
     if (fabs(e->anim_phase) > 1e3) {
       e->anim_phase = 0;
     }
@@ -757,6 +817,25 @@ void pil_circuits_step(pil_world *w, double dt) {
 void pil_circuits_reset(pil_world *w) {
   for (int i = 0; i < w->ncircuits; i++) {
     circuit_reset(w->circuits[i]);
+  }
+}
+
+void pil_circuits_apply_forces(pil_world *w) {
+  for (int n = 0; n < w->ncircuits; n++) {
+    const pil_circuit *c = w->circuits[n];
+    for (int k = 0; k < c->ne; k++) {
+      const pil_celement *e = c->els[k];
+      if (e->kind == CE_MOTOR) {
+        pil_apply_torque(e->mb, e->kc * e->i);
+        pil_apply_torque(e->mb2, -e->kc * e->i);
+      } else if (e->kind == CE_VCOIL) {
+        pil_vec2 f = pil_v2(e->kc * e->i * e->axis.x, e->kc * e->i * e->axis.y);
+        pil_apply_force(e->mb, e->mb->pos, f);
+        if (e->mb2) {
+          pil_apply_force(e->mb2, e->mb2->pos, pil_v2(-f.x, -f.y));
+        }
+      }
+    }
   }
 }
 

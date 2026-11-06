@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <pil/pil_core.h>
+#include <pil/pil_circuit.h>
 #include <stdio.h>
 
 static int fails = 0;
@@ -581,6 +582,59 @@ static void test_circuits(void) {
   }
 }
 
+static void test_electromechanics(void) {
+  puts("electromechanical coupling (DC motor, voice coil)");
+  // motor spinning a flywheel against viscous drag:
+  // \omega(t) = \omega_{ss} (1 - \exp(-t/\tau)),
+  // \omega_{ss} = Kt V / (R c + Kt^2),
+  // \tau = J R / (R c + Kt^2)
+  {
+    pil_world *w = pil_world_new();
+    pil_world_set_gravity(w, 0, 0);
+    double Kt = 0.05;
+    double R = 1.0;
+    double V = 5.0;
+    double c = 1e-3;
+    double J = 2e-4;
+    pil_body *wheel = pil_add_body(
+        w, &(pil_body_desc){.shape = pil_disc(0.1), .mass = 1, .inertia = J});
+    pil_add_revolute(w, pil_on(wheel, 0, 0), pil_at(0, 0));
+    pil_add_torsion_spring(w, wheel, NULL, 0.0, 0.0, c);
+    pil_circuit *ck = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(ck, 0, 1), g = pil_circuit_node(ck, 0, 0);
+    pil_circuit_ground(ck, g);
+    pil_vsource_dc(ck, a, g, V, "V");
+    pil_motor(ck, a, g, wheel, NULL, Kt, R, 1e-6, "M");
+    double den = R * c + Kt * Kt, wss = Kt * V / den, tau = J * R / den;
+    pil_world_advance(w, 0.2, 1e-4);
+    check("flywheel speed at t = 0.2 s", wheel->omega,
+          wss * (1 - exp(-0.2 / tau)), 0.01 * wss);
+    pil_world_free(w);
+  }
+  // voice coil holding a spring-mounted mass: x_ss = K V / (R k)
+  {
+    pil_world *w = pil_world_new();
+    pil_world_set_gravity(w, 0, 0);
+    double K = 2.0;
+    double R = 4.0;
+    double V = 10.0;
+    double k = 100.0;
+    pil_body *m = pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.1, 0.1),
+                                                   .mass = 0.1,
+                                                   .pos = {0, 0}});
+    pil_add_prismatic(w, pil_on(m, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
+    pil_add_spring(w, pil_at(-0.5, 0), pil_on(m, 0, 0), k, 0.5);
+    pil_circuit *ck = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(ck, 0, 1), g = pil_circuit_node(ck, 0, 0);
+    pil_circuit_ground(ck, g);
+    pil_vsource_dc(ck, a, g, V, "V");
+    pil_voice_coil(ck, a, g, m, NULL, (pil_vec2){1, 0}, K, R, 1e-5, "VC");
+    pil_world_advance(w, 3.0, 2e-4);
+    check("voice-coil displacement", m->pos.x, K * V / (R * k), 1e-4);
+    pil_world_free(w);
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -598,6 +652,7 @@ int main(void) {
   test_rope_snap();
   test_link_and_plot();
   test_circuits();
+  test_electromechanics();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

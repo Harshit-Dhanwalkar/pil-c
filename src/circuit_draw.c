@@ -34,12 +34,14 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
                    const pil_style *st, double t) {
   const double h = len / 2;
   cairo_set_line_width(cr, st->line_w);
+
   switch (e->kind) {
   case CE_RESISTOR: {
     const int n = 6; // zigzag: n peaks between two short leads
     const double amp = 8;
     const double lead = len * 0.1;
     const double span = len - 2 * lead;
+
     cairo_move_to(cr, -h, 0);
     cairo_line_to(cr, -h + lead, 0);
     for (int k = 0; k < n; k++) {
@@ -50,18 +52,22 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
     cairo_line_to(cr, h - lead, 0);
     cairo_line_to(cr, h, 0);
     cairo_stroke(cr);
+
     break;
   }
   case CE_SWITCH: {
     int closed = t >= e->t_change ? !e->closed_before : e->closed_before;
+
     line(cr, -h, 0, -h + 6, 0);
     line(cr, h - 6, 0, h, 0);
     cairo_arc(cr, -h + 6, 0, 2.5, 0, 2 * M_PI);
     cairo_stroke(cr);
     cairo_arc(cr, h - 6, 0, 2.5, 0, 2 * M_PI);
     cairo_stroke(cr);
+
     double lx = h - 8.5;
     const double ly = 0;
+
     if (closed) {
       line(cr, -h + 8.5, 0, lx, ly);
     } else {
@@ -73,17 +79,31 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
   case CE_CAPACITOR: {
     const double gap = 4;
     const double pl = 14;
+
     line(cr, -h, 0, -gap, 0);
     line(cr, gap, 0, h, 0);
     cairo_set_line_width(cr, st->line_w * 1.8);
     line(cr, -gap, -pl, -gap, pl);
     line(cr, gap, -pl, gap, pl);
+
     break;
   }
+  case CE_MOTOR: {
+    const double r = 15;
+
+    line(cr, -h, 0, -r, 0);
+    line(cr, r, 0, h, 0);
+    cairo_arc(cr, 0, 0, r, 0, 2 * M_PI);
+    cairo_stroke(cr);
+
+    break; // letter M is drawn upright by caller
+  }
+  case CE_VCOIL:
   case CE_INDUCTOR: {
     const int n = 4;
     const double lead = len * 0.12;
     const double d = (len - 2 * lead) / n;
+
     line(cr, -h, 0, -h + lead, 0);
     line(cr, h - lead, 0, h, 0);
     for (int k = 0; k < n; k++) {
@@ -92,11 +112,13 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
     }
 
     cairo_stroke(cr);
+
     break;
   }
   case CE_VSOURCE: {
     if (e->ac) {
       const double r = 15;
+
       line(cr, -h, 0, -r, 0);
       line(cr, r, 0, h, 0);
       cairo_arc(cr, 0, 0, r, 0, 2 * M_PI);
@@ -107,6 +129,7 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
       cairo_stroke(cr);
     } else {
       const double gap = 4;
+
       line(cr, -h, 0, -gap, 0);
       line(cr, gap, 0, h, 0);
       cairo_set_line_width(cr, st->line_w * 1.5);
@@ -118,6 +141,7 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
   }
   case CE_ISOURCE: {
     const double r = 15;
+
     line(cr, -h, 0, -r, 0);
     line(cr, r, 0, h, 0);
     cairo_arc(cr, 0, 0, r, 0, 2 * M_PI);
@@ -128,11 +152,13 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
     cairo_line_to(cr, 1, 4.5);
     cairo_close_path(cr);
     cairo_fill(cr);
+
     break;
   }
   case CE_DIODE: {
     const double w = 9;
     const double tip = 8;
+
     line(cr, -h, 0, -tip, 0);
     line(cr, tip, 0, h, 0);
     cairo_move_to(cr, -tip, -w);
@@ -142,6 +168,7 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
     cairo_stroke(cr);
     cairo_set_line_width(cr, st->line_w * 1.5);
     line(cr, tip, -w, tip, w);
+
     break;
   }
   }
@@ -152,7 +179,10 @@ static double symbol_length(const pil_celement *e) {
   case CE_RESISTOR:
     return 58;
   case CE_INDUCTOR:
+  case CE_VCOIL:
     return 64;
+  case CE_MOTOR:
+    return 34;
   case CE_CAPACITOR:
     return 24;
   case CE_VSOURCE:
@@ -277,6 +307,10 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
 
     if (anim_scale > 0 && fabs(e->i) > 1e-9) {
       draw_current_dots(cr, a, b, e->anim_phase * anim_scale, sl, st);
+    }
+
+    if (e->kind == CE_MOTOR && !e->hidden) {
+      pil_draw_text(cr, m, "M", 0.5, st);
     }
 
     if (e->label[0] && !e->hidden) {

@@ -18,7 +18,9 @@ typedef enum {
   CE_VSOURCE,
   CE_ISOURCE,
   CE_DIODE,
-  CE_SWITCH
+  CE_SWITCH,
+  CE_MOTOR,
+  CE_VCOIL
 } pil_ce_kind;
 
 struct pil_celement {
@@ -33,10 +35,14 @@ struct pil_celement {
   double is, n_vt; /* diode                                                 */
   double t_change; /* switch                                                */
   int closed_before;
-  double init; /* initial v (C) or i (L)                                    */
-  double v, i; /* state after last step: v(a)-v(b), a->b current            */
-  double vd;   /* diode linearisation point                                 */
-  int branch;  /* MNA branch unknown for L and V (-1 if none)               */
+  double init;        /* initial v (C) or i (L)                             */
+  pil_body *mb, *mb2; /* transducer: driven body and its reaction body      */
+  pil_vec2 axis;      /* voice coil direction (unit)                        */
+  double kc, res;     /* transducer constant and winding resistance         */
+  double wm;          /* transducer: mechanical speed seen by winding       */
+  double v, i;        /* state after last step: v(a)-v(b), a->b current     */
+  double vd;          /* diode linearisation point                          */
+  int branch;         /* MNA branch unknown for L and V (-1 if none)        */
   char label[32];
   double label_dx, label_dy;
   int hidden;
@@ -75,6 +81,7 @@ struct pil_circuit {
 
 int pil_cnode_find(const pil_circuit *c, int n);
 
+void pil_circuits_apply_forces(pil_world *w);
 void pil_circuits_step(pil_world *w, double dt);
 void pil_circuits_reset(pil_world *w);
 void pil_circuits_free(pil_world *w);

@@ -308,6 +308,8 @@ void pil_compute_accel(pil_world *w) {
     }
   }
 
+  pil_circuits_apply_forces(w); // motors and voice coils
+
   if (w->grab.b) {
     pil_vec2 p = pil_body_point(w->grab.b, w->grab.local);
     pil_vec2 f = v_sub(v_mul(v_sub(w->grab.target, p), w->grab.k),

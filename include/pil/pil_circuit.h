@@ -86,6 +86,22 @@ pil_celement *pil_diode(pil_circuit *c, pil_node anode, pil_node cathode,
 pil_celement *pil_switch(pil_circuit *c, pil_node a, pil_node b,
                          double t_change, int closed_before, const char *label);
 
+/* Electromechanical transducers: a winding (resistance r, inductance l) whose
+ * current is tied to a body's motion
+ *   motor:      torque kt * i on `rotor` (reaction on `stator`, NULL = world),
+ *               back-EMF kt * (omega_rotor - omega_stator)
+ *   voice coil: force kf * i along `axis` on `mover` (reaction on `base`),
+ *               back-EMF kf * (v_mover - v_base) . axis
+ * v(a) - v(b) = r i + l di/dt + back-EMF
+ * Coupling is evaluated once per world step, so keep world step small against
+ * mechanical dynamics */
+pil_celement *pil_motor(pil_circuit *c, pil_node a, pil_node b, pil_body *rotor,
+                        pil_body *stator, double kt, double r, double l,
+                        const char *label);
+pil_celement *pil_voice_coil(pil_circuit *c, pil_node a, pil_node b,
+                             pil_body *mover, pil_body *base, pil_vec2 axis,
+                             double kf, double r, double l, const char *label);
+
 /* Placement of label: pixel offset from symbol centre (dy up) */
 void pil_celement_set_label_at(pil_celement *e, double dx_px, double dy_px);
 /* Do not draw this element (or its symbol; its wires stay) */

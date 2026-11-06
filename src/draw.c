@@ -8,6 +8,7 @@
 #include "pil/pil_draw.h"
 #include "pil_circuit_draw.h"
 #include "pil_internal.h"
+#include "pil_circuit_draw.h"
 #include "plot.h"
 #include <math.h>
 #include <stdio.h>
