@@ -435,6 +435,152 @@ static void test_link_and_plot(void) {
   pil_world_free(w);
 }
 
+static void test_circuits(void) {
+  puts("circuits (RC, RL, RLC, LC energy, AC, diode, switch)");
+  // RC charge: v = V (1 - \exp(-t/RC))
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 1), b = pil_circuit_node(c, 1, 1),
+             g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_dc(c, a, g, 5.0, "V");
+    pil_resistor(c, a, b, 1e3, "R");
+    pil_celement *cap = pil_capacitor(c, b, g, 1e-6, 0.0, "C");
+    pil_world_advance(w, 2e-3, 1e-3);
+    check("RC charge at 2 tau", pil_celement_voltage(cap),
+          5.0 * (1 - exp(-2.0)), 5e-4);
+    pil_world_free(w);
+  }
+  // RL: i = V/R (1 - \exp(-tR/L))
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 1), b = pil_circuit_node(c, 1, 1),
+             g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_dc(c, a, g, 10.0, "V");
+    pil_resistor(c, a, b, 10.0, "R");
+    pil_celement *ind = pil_inductor(c, b, g, 0.1, 0.0, "L");
+    pil_world_advance(w, 20e-3, 1e-3);
+    check("RL current at 2 tau", pil_celement_current(ind),
+          1.0 * (1 - exp(-2.0)), 5e-4);
+    pil_world_free(w);
+  }
+  // series RLC, capacitor initially charged
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_circuit_set_step(c, 1e-6);
+    pil_node a = pil_circuit_node(c, 0, 1), b = pil_circuit_node(c, 1, 1),
+             g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    double R = 2.0;
+    double L = 1e-3;
+    double C = 1e-6;
+    pil_celement *cap = pil_capacitor(c, a, g, C, 1.0, "C");
+    pil_inductor(c, a, b, L, 0.0, "L");
+    pil_resistor(c, b, g, R, "R");
+    double al = R / (2 * L);
+    double w0 = 1 / sqrt(L * C);
+    double wd = sqrt(w0 * w0 - al * al);
+    double t = 150e-6;
+    pil_world_advance(w, t, 1e-5);
+    check("RLC ringing, v_C(150 us)", pil_celement_voltage(cap),
+          exp(-al * t) * (cos(wd * t) + al / wd * sin(wd * t)), 2e-3);
+    pil_world_free(w);
+  }
+  // LC tank: trapezoidal rule keeps energy
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 1), g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_capacitor(c, a, g, 1e-6, 2.0, "C");
+    pil_inductor(c, a, g, 1e-3, 0.0, "L");
+    double E0 = pil_circuit_energy(c);
+    pil_world_advance(w, 5e-3, 1e-4);
+    check("LC energy after 30 cycles", pil_circuit_energy(c) / E0, 1.0, 1e-3);
+    pil_world_free(w);
+  }
+  // RC low-pass: gain 1/\sqrt(2) at w = 1/RC
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 1), b = pil_circuit_node(c, 1, 1),
+             g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_ac(c, a, g, 1.0, 1000.0 / (2 * M_PI), 0.0, "v");
+    pil_resistor(c, a, b, 1e3, "R");
+    pil_celement *cap = pil_capacitor(c, b, g, 1e-6, 0.0, "C");
+    pil_world_advance(w, 50e-3, 1e-3);
+    double peak = 0;
+    for (int i = 0; i < 400; i++) {
+      pil_world_advance(w, 2e-5, 1e-3);
+      peak = fmax(peak, fabs(pil_celement_voltage(cap)));
+    }
+
+    check("RC low-pass gain at the corner", peak, 1 / sqrt(2.0), 2e-3);
+    pil_world_free(w);
+  }
+  // half-wave rectifier: peak output = V_pk - V_d with V_d from diode law
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 1), b = pil_circuit_node(c, 1, 1),
+             g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_ac(c, a, g, 5.0, 50.0, 0.0, "v");
+    pil_diode(c, a, b, 1e-12, 0.026, "D");
+    pil_resistor(c, b, g, 1e3, "R");
+    double vd = 0.6;
+    for (int i = 0; i < 60; i++) { // Newton on 5 = vd + R Is (\exp(vd/nvt) - 1)
+      double f = vd + 1e3 * 1e-12 * (exp(vd / 0.026) - 1) - 5.0;
+      double df = 1 + 1e3 * 1e-12 * exp(vd / 0.026) / 0.026;
+      vd -= f / df;
+    }
+
+    double vmax = -1e9;
+    double vmin = 1e9;
+    int worst = 0;
+    for (int i = 0; i < 400; i++) {
+      pil_world_advance(w, 5e-5, 1e-3);
+      double vo = pil_circuit_node_voltage(c, b);
+      vmax = fmax(vmax, vo);
+      vmin = fmin(vmin, vo);
+      worst = pil_circuit_newton_iterations(c) > worst
+                  ? pil_circuit_newton_iterations(c)
+                  : worst;
+    }
+
+    check("rectifier peak = V_pk - V_d", vmax, 5.0 - vd, 3e-3);
+    check("rectifier blocks the negative half", vmin, 0.0, 1e-6);
+    check("diode Newton stays cheap (< 30 iterations)", worst < 30, 1, 0);
+    pil_world_free(w);
+  }
+  // switch closes at 1 ms, then RC charges
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 1), s = pil_circuit_node(c, 1, 1),
+             b = pil_circuit_node(c, 2, 1), g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_circuit_set_theta(c, 1.0); /* backward Euler: no ringing at a switch */
+    pil_circuit_set_step(c, 2e-6);
+    pil_vsource_dc(c, a, g, 5.0, "V");
+    pil_switch(c, a, s, 1e-3, 0, "S");
+    pil_resistor(c, s, b, 1e3, "R");
+    pil_celement *cap = pil_capacitor(c, b, g, 1e-6, 0.0, "C");
+    pil_world_advance(w, 0.9e-3, 1e-4);
+    // open switch is 1 Gohm, so a few microvolts leak through
+    check("open switch: no charge", pil_celement_voltage(cap), 0.0, 2e-5);
+    pil_world_advance(w, 2e-3, 1e-4);
+    check("one \\tau after closing", pil_celement_voltage(cap),
+          5.0 * (1 - exp(-1.9)), 2e-2);
+    pil_world_free(w);
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -451,6 +597,7 @@ int main(void) {
   test_weld();
   test_rope_snap();
   test_link_and_plot();
+  test_circuits();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
