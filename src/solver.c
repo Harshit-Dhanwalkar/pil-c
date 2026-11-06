@@ -112,8 +112,8 @@ static int build_rows(pil_world *w) {
   return m;
 }
 
-/* K = J M^-1 J^T for rows in w->rows (stored at w->K; m right-hand-side slots
- * follow it) */
+// K = J M^-1 J^T for rows in w->rows (stored at w->K; m right-hand-side slots
+// follow it)
 static void build_K(pil_world *w, int m) {
   if (m <= 0) {
     return;
@@ -188,24 +188,42 @@ static void solve_lambda(pil_world *w, int m) {
   }
 }
 
-// A rope that goes taut while its ends are still moving apart must stop that
-// motion at once (an inelastic impulse), otherwise a stabilised constraint lets
-// it stretch before arresting. We solve for impulses that zero extension rate
-// of snapped ropes and leave every other constraint's velocity untouched, then
-// apply them to body velocities
+// Impacts. A rope that goes taut while its ends are still moving apart must
+// stop that motion at once (inelastic), and a body that arrives at a stop must
+// rebound with its restitution; otherwise stabilised constraints would let rope
+// stretch or body sink before reacting
+// Solve for impulses that give impacting rows their post-impact rate (rope:
+// zero extension rate, stop: -e times arrival rate) and leave every other
+// constraint's rate untouched, then apply them to body velocities
+static int stop_hit(const pil_element *e, pil_row *r) {
+  if (e->kind != EL_STOP || !pil_isdyn(e->a.body)) {
+    return 0;
+  }
+
+  pil_stop_row(e, r);
+
+  return r->phi > -1e-9 && r->vel > 1e-6;
+}
+
 void pil_project_rope_snaps(pil_world *w) {
   const double vtol = 1e-4;
   int any = 0;
   for (int i = 0; i < w->nels && !any; i++) {
     pil_element *e = w->els[i];
+    pil_row r[2];
+    if (stop_hit(e, &r[0])) {
+      any = 1;
+      continue;
+    }
+
     if (!pil_is_rope(e)) {
       continue;
     }
+
     if (!pil_isdyn(e->a.body) && !pil_isdyn(e->b.body)) {
       continue;
     }
 
-    pil_row r[2];
     if (pil_constraint_eval(e, w->tcur, r, 1) > 0 &&
         r[0].phi > -1e-3 * e->length && r[0].vel > vtol) {
       any = 1;
@@ -216,17 +234,34 @@ void pil_project_rope_snaps(pil_world *w) {
     return;
   }
 
+  double T_before = pil_world_kinetic(w);
   int m = 0;
   for (int i = 0; i < w->nels; i++) {
     pil_element *e = w->els[i];
+    pil_row r[2];
+    if (e->kind == EL_STOP) {
+      if (!stop_hit(e, &r[0])) {
+        continue;
+      }
+
+      GROW(w->rows, m + 1, w->rowcap);
+      w->rows[m].el = e;
+      w->rows[m].idx = 0;
+      w->rows[m].r = r[0];
+      w->rows[m].lambda = 0;
+      w->rows[m].target = (1.0 + e->k) * r[0].vel;
+      m++;
+      continue;
+    }
+
     if (!pil_is_constraint(e)) {
       continue;
     }
+
     if (!pil_isdyn(e->a.body) && !pil_isdyn(e->b.body)) {
       continue;
     }
 
-    pil_row r[2];
     int n = pil_constraint_eval(e, w->tcur, r, 1);
     for (int k = 0; k < n; k++) {
       double target = 0;
@@ -250,10 +285,12 @@ void pil_project_rope_snaps(pil_world *w) {
 
   for (int it = 0; it < 4; it++) {
     build_K(w, m);
-    double *K = w->K, *rhs = w->K + (size_t)m * m;
+    double *K = w->K;
+    double *rhs = w->K + (size_t)m * m;
     for (int i = 0; i < m; i++) {
       rhs[i] = w->rows[i].target;
     }
+
     if (!solve_dense(K, rhs, m)) {
       return;
     }
@@ -280,11 +317,17 @@ void pil_project_rope_snaps(pil_world *w) {
       a->vel.y -= r->r.ja[1] * r->lambda * a->inv_mass;
       a->omega -= r->r.ja[2] * r->lambda * a->inv_inertia;
     }
+
     if (pil_isdyn(b)) {
       b->vel.x -= r->r.jb[0] * r->lambda * b->inv_mass;
       b->vel.y -= r->r.jb[1] * r->lambda * b->inv_mass;
       b->omega -= r->r.jb[2] * r->lambda * b->inv_inertia;
     }
+  }
+
+  double lost = T_before - pil_world_kinetic(w);
+  if (lost > 0) {
+    w->dissipated += lost;
   }
 }
 

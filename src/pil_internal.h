@@ -25,7 +25,8 @@ typedef enum {
   EL_CIRCLE_ROLL,
   EL_LINK,
   EL_PULLEY,
-  EL_FLOOR
+  EL_FLOOR,
+  EL_STOP
 } pil_el_kind;
 
 struct pil_element {
@@ -67,7 +68,8 @@ typedef enum {
   D_ANGLE,
   D_GROUND,
   D_GRAVITY,
-  D_ANGLE_PTS
+  D_ANGLE_PTS,
+  D_ENERGY_BAR
 } pil_deco_kind;
 struct pil_deco {
   pil_deco_kind kind;
@@ -140,9 +142,16 @@ struct pil_world {
   struct pil_circuit **circuits;
   int ncircuits, ccap;
   pil_overlay *overlays;
-  int noverlays, ocap;
+  int noverlays;
+  int ocap;
   pil_vec2 g;
-  double t, tcur, alpha, beta, drag_lin, drag_ang;
+  double t;
+  double tcur;
+  double alpha;
+  double beta;
+  double drag_lin;
+  double drag_ang;
+  double dissipated; /* kinetic energy lost in impacts (stops, rope snaps) */
   int frozen;
   int have_snapshot;
   struct {
@@ -192,6 +201,8 @@ pil_vec2 pil_anchor_vel(pil_anchor a);
 int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
                         int force_active);
 int pil_is_constraint(const pil_element *e);
+/* Unilateral stop: fills row (phi <= 0 allowed) and returns its restitution */
+double pil_stop_row(const pil_element *e, pil_row *r);
 int pil_is_rope(const pil_element *e); /* one-sided (pull-only) constraint */
 double pil_rope_length(const pil_element *e); /* current geometric length */
 void pil_element_apply(pil_element *e, pil_world *w, double t);

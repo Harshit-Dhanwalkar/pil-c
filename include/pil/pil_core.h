@@ -181,6 +181,9 @@ void pil_world_snapshot(pil_world *w); /* remember current state as initial */
 void pil_world_reset(pil_world *w);
 
 double pil_world_energy(const pil_world *w); /* kinetic + gravity + springs */
+double pil_world_kinetic(const pil_world *w);
+/* Kinetic energy lost so far in impacts (stops, ropes snapping taut) */
+double pil_world_dissipated(const pil_world *w);
 double
 pil_world_constraint_error(const pil_world *w); /* max |\Phi| over all rows */
 
@@ -274,6 +277,14 @@ typedef enum {
 } pil_coord;
 pil_element *pil_add_link(pil_world *w, pil_body *a, pil_coord ca, pil_body *b,
                           pil_coord cb, double ratio);
+/* Unilateral stop on one coordinate of a body (x, y or angle): coordinate may
+ * not pass `limit` (upper: q <= limit, otherwise q >= limit). A body arriving
+ * at stop is hit by an impulse that reverses its velocity along coordinate with
+ * restitution e (v+ = -e v-), and rest of system (joints, ropes) takes its
+ * share consistently. Resting contact is not modelled: stop is for impacts,
+ * e.g. a block bouncing between buffers */
+pil_element *pil_add_stop(pil_world *w, pil_body *b, pil_coord coord,
+                          double limit, int upper, double restitution);
 /* Rigidly join two bodies at a point (pin + fixed relative angle)
  * Returns pin */
 pil_element *pil_add_weld(pil_world *w, pil_anchor a, pil_anchor b);
@@ -330,6 +341,14 @@ pil_deco *pil_add_angle_between(pil_world *w, pil_anchor center, pil_anchor p1,
 pil_deco *pil_add_ground(pil_world *w, pil_vec2 a, pil_vec2 b);
 /* Small "g" arrow in corner of textbook figures */
 pil_deco *pil_add_gravity_indicator(pil_world *w, pil_vec2 at);
+/* Energy bar (textbook E0 / -dE / T / V column). `bl` is bottom-left corner in
+ * world coordinates, w_px x h_px its size `v_ref` is potential-energy zero:
+ * V = E - T - v_ref
+ * Full height stands for total energy at creation, so energy lost in impacts
+ * shows as white space above T + V. Call after world is built and at its
+ * initial state */
+pil_deco *pil_add_energy_bar(pil_world *w, pil_vec2 bl, double w_px,
+                             double h_px, double v_ref);
 /* "g (x)": gravity pointing into page (plan-view figures) */
 pil_deco *pil_add_gravity_into_page(pil_world *w, pil_vec2 at);
 /* Arc from world angle `ref_angle` to live angle of `body` */

@@ -68,11 +68,13 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/bowl
 ./build/crank
 ./build/frame
+./build/impact
 ./build/incline
-./build/ring
+./build/motor
 ./build/pulleys
 ./build/swing
 ./build/rectfier
+./build/ring
 ./build/rlc
 ```
 

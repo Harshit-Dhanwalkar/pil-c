@@ -223,6 +223,28 @@ pil_element *pil_add_fixed_angle(pil_world *w, pil_body *a, pil_body *b,
   return e;
 }
 
+pil_element *pil_add_stop(pil_world *w, pil_body *b, pil_coord coord,
+                          double limit, int upper, double restitution) {
+  pil_element *e = new_el(w, EL_STOP);
+  e->a.body = b;
+  e->ca = coord;
+  e->phase = limit;
+  e->sigma = upper ? 1 : -1;
+  e->k = restitution;
+  e->hidden = 1;
+
+  return e;
+}
+
+double pil_stop_row(const pil_element *e, pil_row *r) {
+  memset(r, 0, sizeof *r);
+  r->phi = e->sigma * (coord_q(e->a.body, e->ca) - e->phase);
+  r->vel = e->sigma * coord_v(e->a.body, e->ca);
+  r->ja[e->ca] = e->sigma;
+
+  return e->k;
+}
+
 pil_element *pil_add_prismatic(pil_world *w, pil_anchor a,
                                pil_anchor line_origin, pil_vec2 dir) {
   double ta = a.body ? a.body->angle : 0;

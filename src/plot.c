@@ -101,6 +101,7 @@ void pil_plots_record(pil_world *w, double sample_dt, double max_dt) {
 
   for (int i = 0; i < nb; i++) {
     const pil_body *b = w->bodies[i];
+
     save[6 * i + 0] = b->pos.x;
     save[6 * i + 1] = b->pos.y;
     save[6 * i + 2] = b->angle;
@@ -110,6 +111,7 @@ void pil_plots_record(pil_world *w, double sample_dt, double max_dt) {
   }
 
   double t0 = w->t;
+  double diss0 = w->dissipated;
 
   for (int i = 0; i < w->nplots; i++) {
     pil_plot *p = w->plots[i];
@@ -149,6 +151,7 @@ void pil_plots_record(pil_world *w, double sample_dt, double max_dt) {
   free(save);
   w->t = t0;
   w->tcur = t0;
+  w->dissipated = diss0;
   for (int i = 0; i < w->nels; i++) {
     w->els[i]->rope_off = 0;
   }

@@ -461,7 +461,22 @@ void pil_world_advance(pil_world *w, double duration, double max_dt) {
   }
 }
 
-// diagnostics
+// Diagnostics
+double pil_world_kinetic(const pil_world *w) {
+  double T = 0;
+  for (int i = 0; i < w->nbodies; i++) {
+    const pil_body *b = w->bodies[i];
+    if (b->dof >= 0) {
+      T += 0.5 * b->mass * v_dot(b->vel, b->vel) +
+           0.5 * b->inertia * b->omega * b->omega;
+    }
+  }
+
+  return T;
+}
+
+double pil_world_dissipated(const pil_world *w) { return w->dissipated; }
+
 double pil_world_energy(const pil_world *w) {
   double E = 0;
   for (int i = 0; i < w->nbodies; i++) {
@@ -527,6 +542,7 @@ void pil_world_reset(pil_world *w) {
 
   w->t = 0;
   w->tcur = 0;
+  w->dissipated = 0;
   for (int i = 0; i < w->nels; i++) {
     w->els[i]->rope_off = 0;
   }
@@ -647,6 +663,18 @@ static pil_deco *new_deco(pil_world *w, pil_deco_kind k, const char *text) {
   snprintf(d->text, sizeof d->text, "%s", text ? text : "");
   GROW(w->decos, w->ndecos, w->dcap);
   w->decos[w->ndecos++] = d;
+
+  return d;
+}
+
+pil_deco *pil_add_energy_bar(pil_world *w, pil_vec2 bl, double w_px,
+                             double h_px, double v_ref) {
+  pil_deco *d = new_deco(w, D_ENERGY_BAR, "");
+  d->a = pil_at(bl.x, bl.y);
+  d->dx = w_px;
+  d->dy = h_px;
+  d->ref = v_ref;
+  d->offset = pil_world_energy(w) - v_ref; // E0 above potential zero
 
   return d;
 }

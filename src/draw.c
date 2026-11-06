@@ -8,7 +8,6 @@
 #include "pil/pil_draw.h"
 #include "pil_circuit_draw.h"
 #include "pil_internal.h"
-#include "pil_circuit_draw.h"
 #include "plot.h"
 #include <math.h>
 #include <stdio.h>
@@ -861,6 +860,9 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
                   d->text, 0.5, st);
     break;
   }
+  case D_ENERGY_BAR: {
+    break;
+  }
   case D_ANGLE: {
     double th = d->body ? d->body->angle : 0;
     double r = d->radius;
@@ -884,6 +886,58 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
   }
 }
 
+// Energy column: V (light) and T (dark) stacked from bottom, white gap up to E0
+// is what impacts took away
+static void draw_energy_bar(cairo_t *cr, const pil_world *w, const pil_deco *d,
+                            const pil_view *v, const pil_style *st) {
+  pil_vec2 o = S(v, pil_anchor_world(d->a));
+  double bw = d->dx, bh = d->dy, e0 = d->offset;
+  if (e0 <= 0) {
+    return;
+  }
+
+  double T = pil_world_kinetic(w);
+  double V = pil_world_energy(w) - T - d->ref;
+  double hT = bh * (T / e0), hV = bh * (V / e0);
+  if (hT < 0) {
+    hT = 0;
+  }
+  if (hV < 0) {
+    hV = 0;
+  }
+  if (hT + hV > bh) {
+    hV = bh - hT;
+  }
+
+  cairo_save(cr);
+  cairo_set_line_width(cr, st->line_w * 0.8);
+  cairo_set_source_rgb(cr, 0.80, 0.80, 0.80);
+  cairo_rectangle(cr, o.x, o.y - hV, bw, hV);
+  cairo_fill(cr);
+  cairo_set_source_rgb(cr, 0.45, 0.45, 0.45);
+  cairo_rectangle(cr, o.x, o.y - hV - hT, bw, hT);
+  cairo_fill(cr);
+  ink(cr, st);
+  cairo_rectangle(cr, o.x, o.y - bh, bw, bh);
+  cairo_stroke(cr);
+  cairo_move_to(cr, o.x, o.y - hV);
+  cairo_line_to(cr, o.x + bw, o.y - hV);
+  cairo_move_to(cr, o.x, o.y - hV - hT);
+  cairo_line_to(cr, o.x + bw, o.y - hV - hT);
+  cairo_stroke(cr);
+  cairo_restore(cr);
+
+  text_draw(cr, pil_v2(o.x + bw / 2, o.y - bh - 12), "E_0", 0.5, st, 0);
+  text_draw(cr, pil_v2(o.x - 6, o.y - hV - hT - 2), "\u2212\u0394E", 1.0, st,
+            0);
+  if (hT > 8) {
+    text_draw(cr, pil_v2(o.x + bw + 6, o.y - hV - hT / 2), "T", 0.0, st, 0);
+  }
+  if (hV > 8) {
+    text_draw(cr, pil_v2(o.x + bw + 6, o.y - hV / 2), "V", 0.0, st, 0);
+  }
+}
+
 // Frame
 void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
                     const pil_style *st) {
@@ -900,7 +954,9 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
     draw_terrain(cr, w->terrains[i], w->t, v, st);
   }
   for (int i = 0; i < w->ndecos; i++) {
-    if (w->decos[i]->kind == D_GROUND) {
+    if (w->decos[i]->kind == D_ENERGY_BAR) {
+      draw_energy_bar(cr, w, w->decos[i], v, st);
+    } else if (w->decos[i]->kind != D_GROUND) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }

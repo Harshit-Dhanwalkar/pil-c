@@ -1,8 +1,8 @@
 /* Numerical regression tests against analytic solutions */
 
 #include <math.h>
-#include <pil/pil_core.h>
 #include <pil/pil_circuit.h>
+#include <pil/pil_core.h>
 #include <stdio.h>
 
 static int fails = 0;
@@ -635,6 +635,30 @@ static void test_electromechanics(void) {
   }
 }
 
+static void test_stops(void) {
+  puts("impact stops");
+  // free mass hits a wall at x = 1 with restitution e: speed -> -e v and lost
+  // kinetic energy is (1 - e^2) m v^2 / 2
+  double es[] = {1.0, 0.6, 0.0};
+  for (int i = 0; i < 3; i++) {
+    pil_world *w = pil_world_new();
+    pil_world_set_gravity(w, 0, 0);
+    double v0 = 2.0;
+    double m = 1.5;
+    pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.1, 0.1),
+                                                   .mass = m,
+                                                   .pos = {0, 0},
+                                                   .vel = {v0, 0}});
+    pil_add_prismatic(w, pil_on(b, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
+    pil_add_stop(w, b, PIL_COORD_X, 1.0, 1, es[i]);
+    pil_world_advance(w, 0.8, 1e-3);
+    check("rebound speed", b->vel.x, -es[i] * v0, 1e-3);
+    check("energy lost", pil_world_dissipated(w),
+          0.5 * m * v0 * v0 * (1 - es[i] * es[i]), 1e-3);
+    pil_world_free(w);
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -653,6 +677,7 @@ int main(void) {
   test_link_and_plot();
   test_circuits();
   test_electromechanics();
+  test_stops();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
