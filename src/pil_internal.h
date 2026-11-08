@@ -26,7 +26,8 @@ typedef enum {
   EL_LINK,
   EL_PULLEY,
   EL_FLOOR,
-  EL_STOP
+  EL_STOP,
+  EL_CIRCLE_CONTACT
 } pil_el_kind;
 
 struct pil_element {
@@ -37,6 +38,8 @@ struct pil_element {
   double length;       /* distance constraint                            */
   double phase;        /* fixed angle / drive phase / rolling offset     */
   double mu;           /* floor friction coefficient                     */
+  double s0, s1;       /* floor: contact only for s0 <= s <= s1 along dir */
+  int ranged;          /* floor / circle contact: restricted to a range  */
   int ca, cb;          /* link: coordinate of a / b (pil_coord)          */
   double radius2, ref; /* circle rolling: track radius, reference angle  */
   int sigma;           /* circle rolling: -1 inside track, +1 outside    */

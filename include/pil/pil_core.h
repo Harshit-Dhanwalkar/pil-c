@@ -298,6 +298,24 @@ pil_element *pil_add_floor_contact(pil_world *w, pil_body *body,
                                    pil_anchor line_point, pil_vec2 line_dir,
                                    double k, double c, double mu);
 
+/* Restrict a floor contact to stretch s0 <= s <= s1 measured along its
+ * direction from `line_point` (a ramp that ends, a ledge) */
+void pil_floor_set_range(pil_element *floor, double s0, double s1);
+/* Unilateral contact (penalty + regularised Coulomb friction) between a disc
+ * (or point mass) `body` and a circular track of radius R whose centre is
+ * anchor `centre` (on a body or world). inside != 0: disc runs on concave side
+ * (loop, bowl); otherwise on convex side (a hump)
+ * Force is zero as soon as disc leaves track, so free flight and re-contact
+ * need no special handling
+ * Equal and opposite forces act on track body */
+pil_element *pil_add_circle_contact(pil_world *w, pil_body *body,
+                                    pil_anchor centre, double R, int inside,
+                                    double k, double c, double mu);
+/* Limit a circle contact to arc that starts at angle a0 (rad, measured from
+ * track centre) and spans `span` counter-clockwise: a fillet joining a ramp to
+ * floor */
+void pil_circle_contact_set_arc(pil_element *c, double a0, double span);
+
 /* Generic element properties */
 void pil_element_set_label(pil_element *e, const char *text);
 void pil_element_set_label_at(pil_element *e, const char *text, double dx_px,

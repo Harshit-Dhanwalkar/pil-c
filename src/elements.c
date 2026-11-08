@@ -326,6 +326,34 @@ pil_element *pil_add_floor_contact(pil_world *w, pil_body *body,
   return e;
 }
 
+void pil_floor_set_range(pil_element *e, double s0, double s1) {
+  e->ranged = 1;
+  e->s0 = s0;
+  e->s1 = s1;
+}
+
+pil_element *pil_add_circle_contact(pil_world *w, pil_body *body,
+                                    pil_anchor centre, double R, int inside,
+                                    double k, double c, double mu) {
+  pil_element *e = new_el(w, EL_CIRCLE_CONTACT);
+  e->a.body = body;
+  e->b = centre;
+  e->radius2 = R;
+  e->sigma = inside ? -1 : 1;
+  e->k = k;
+  e->c = c;
+  e->mu = mu;
+  e->hidden = 1;
+
+  return e;
+}
+
+void pil_circle_contact_set_arc(pil_element *e, double a0, double span) {
+  e->ranged = 1;
+  e->s0 = a0;
+  e->s1 = span;
+}
+
 pil_terrain *pil_add_terrain(pil_world *w, pil_height_fn fn, void *user,
                              double scroll_speed) {
   pil_terrain *t = calloc(1, sizeof *t);
@@ -451,6 +479,13 @@ static double floor_eval(const pil_element *e, int apply) {
       continue;
     }
 
+    if (e->ranged) {
+      double s = v_dot(u, v_sub(pts[i], P0));
+      if (s < e->s0 || s > e->s1) {
+        continue;
+      }
+    }
+
     energy += 0.5 * e->k * depth * depth;
     if (!apply) {
       continue;
@@ -478,6 +513,70 @@ static double floor_eval(const pil_element *e, int apply) {
     if (L.body) {
       pil_apply_force(L.body, pts[i], v_mul(F, -1.0));
     }
+  }
+
+  return energy;
+}
+
+// Disc on a circular track: depth is how far disc has pushed into wall, n
+// points from wall towards disc
+static double circle_eval(const pil_element *e, int apply) {
+  pil_body *bd = e->a.body;
+  pil_anchor L = e->b;
+  double R = e->radius2, r = bd->shape.r;
+  pil_vec2 O = pil_anchor_world(L);
+  pil_vec2 C = v_add(bd->pos, v_rot(bd->shape.offset, bd->angle));
+  pil_vec2 d = v_sub(C, O);
+  double len = sqrt(v_dot(d, d));
+  if (len < 1e-9) {
+    return 0;
+  }
+
+  pil_vec2 out = v_mul(d, 1.0 / len); // from track centre to disc
+  double depth = e->sigma < 0 ? len + r - R : R + r - len;
+  // disc centre must be on the proper side of the wall: a disc outside a loop
+  // is not pushed into it
+  if (depth <= 0 || (e->sigma < 0 ? len > R : len < R)) {
+    return 0;
+  }
+
+  if (e->ranged) {
+    double span = e->s1, a = atan2(d.y, d.x) - e->s0;
+    a -= 2 * M_PI * floor(a / (2 * M_PI));
+    if (a > span) {
+      return 0;
+    }
+  }
+
+  double energy = 0.5 * e->k * depth * depth;
+  if (!apply) {
+    return energy;
+  }
+
+  pil_vec2 n = e->sigma < 0 ? v_mul(out, -1.0) : out;
+  pil_vec2 u = v_perp(n), pt = v_sub(C, v_mul(n, r)), vs_ = {0, 0};
+  pil_vec2 vp = pil_body_velocity_at(bd, pt);
+  if (L.body) {
+    vs_ = pil_body_velocity_at(L.body, pt);
+    vp = v_sub(vp, vs_);
+  }
+
+  double N = e->k * depth - e->c * v_dot(n, vp);
+  if (N < 0) {
+    N = 0;
+  }
+
+  double vsl = 1e-2, ft = -v_dot(u, vp) * (e->mu * N / vsl), lim = e->mu * N;
+  if (ft > lim) {
+    ft = lim;
+  } else if (ft < -lim) {
+    ft = -lim;
+  }
+
+  pil_vec2 F = v_add(v_mul(n, N), v_mul(u, ft));
+  pil_apply_force(bd, pt, F);
+  if (L.body) {
+    pil_apply_force(L.body, pt, v_mul(F, -1.0));
   }
 
   return energy;
@@ -521,12 +620,16 @@ void pil_element_apply(pil_element *e, pil_world *w, double t) {
 
     break;
   }
-  case EL_FORCE:
+  case EL_FORCE: {
     pil_apply_force(e->a.body, pil_anchor_world(e->a), e->f);
+
     break;
-  case EL_CUSTOM:
+  }
+  case EL_CUSTOM: {
     e->fn(w, t, e->user);
+
     break;
+  }
   case EL_TERRAIN_CONTACT: {
     pil_body *b = e->a.body;
     double ds = 1e-4, s = b->pos.x + e->terrain->scroll * t;
@@ -545,13 +648,23 @@ void pil_element_apply(pil_element *e, pil_world *w, double t) {
       e->last_force = F;
       pil_apply_force(b, b->pos, pil_v2(0, F));
     }
+
     break;
   }
-  case EL_FLOOR:
+  case EL_FLOOR: {
     floor_eval(e, 1);
+
     break;
-  default:
+  }
+  case EL_CIRCLE_CONTACT: {
+    circle_eval(e, 1);
+
     break;
+  }
+  default: {
+
+    break;
+  }
   }
 }
 
@@ -560,12 +673,14 @@ double pil_element_energy(const pil_element *e, double t) {
   case EL_SPRING: {
     pil_vec2 d = v_sub(pil_anchor_world(e->a), pil_anchor_world(e->b));
     double x = sqrt(v_dot(d, d)) - e->rest;
+
     return 0.5 * e->k * x * x;
   }
   case EL_TORSION: {
-    double ta = e->a.body ? e->a.body->angle : 0,
-           tb = e->b.body ? e->b.body->angle : 0;
+    double ta = e->a.body ? e->a.body->angle : 0;
+    double tb = e->b.body ? e->b.body->angle : 0;
     double x = ta - tb - e->rest;
+
     return 0.5 * e->k * x * x;
   }
   case EL_TERRAIN_CONTACT: {
@@ -573,10 +688,15 @@ double pil_element_energy(const pil_element *e, double t) {
     double h =
         e->terrain->fn(b->pos.x + e->terrain->scroll * t, e->terrain->user);
     double delta = h + e->radius - b->pos.y;
+
     return delta > 0 ? 0.5 * e->k * delta * delta : 0.0;
   }
-  case EL_FLOOR:
+  case EL_FLOOR: {
     return floor_eval(e, 0);
+  }
+  case EL_CIRCLE_CONTACT: {
+    return circle_eval(e, 0);
+  }
   default:
     return 0.0;
   }

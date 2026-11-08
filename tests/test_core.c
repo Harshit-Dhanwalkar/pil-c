@@ -659,6 +659,53 @@ static void test_stops(void) {
   }
 }
 
+static void test_circle_contact(void) {
+  puts("circle contact (loop-the-loop)");
+  double g = 9.81, Rl = 1.0, r = 0.05, D = Rl - r, m = 1.0;
+  /* frictionless disc sliding inside a loop leaves the wall where
+   * cos(phi) = (2 g D - v0^2) / (3 g D), phi measured from the bottom */
+  {
+    pil_world *w = pil_world_new();
+    pil_body *b =
+        pil_add_body(w, &(pil_body_desc){.shape = pil_disc(r),
+                                         .mass = m,
+                                         .pos = {0, Rl - D},
+                                         .vel = {sqrt(3 * g * D), 0}});
+    pil_add_circle_contact(w, b, pil_at(0, Rl), Rl, 1, 4e4, 40.0, 0.0);
+    double want = acos(-1.0 / 3.0), got = -1;
+    for (int i = 0; i < 4000 && got < 0; i++) {
+      pil_world_advance(w, 1e-3, 1e-4);
+      pil_vec2 d = {b->pos.x, b->pos.y - Rl};
+      if (D - hypot(d.x, d.y) > 2e-3) {
+        got = atan2(d.x, -d.y);
+      }
+    }
+    check("detachment angle", got, want, 0.12);
+    pil_world_free(w);
+  }
+  /* rolling without slipping (high mu): bottom speed^2 = 4/3 g h for a solid
+   * disc released from rest at height h above the bottom of the track */
+  {
+    pil_world *w = pil_world_new();
+    double th = 1.0; /* start angle from the bottom */
+    pil_body *b = pil_add_body(
+        w, &(pil_body_desc){.shape = pil_disc(r),
+                            .mass = m,
+                            .pos = {D * sin(th), Rl - D * cos(th)}});
+    pil_add_circle_contact(w, b, pil_at(0, Rl), Rl, 1, 4e4, 40.0, 5.0);
+    double h = D * (1 - cos(th)), vmax = 0;
+    for (int i = 0; i < 3000; i++) {
+      pil_world_advance(w, 1e-3, 1e-4);
+      double sp = hypot(b->vel.x, b->vel.y);
+      if (sp > vmax) {
+        vmax = sp;
+      }
+    }
+    check("rolling bottom speed", vmax, sqrt(4.0 / 3.0 * g * h), 0.03);
+    pil_world_free(w);
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -678,6 +725,7 @@ int main(void) {
   test_circuits();
   test_electromechanics();
   test_stops();
+  test_circle_contact();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
