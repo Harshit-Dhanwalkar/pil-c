@@ -2,7 +2,7 @@
  * rlc.c - a driven series RLC circuit, with voltages plotted beneath it
  * Source v(t) -> R -> L -> C, all in one loop; panel shows source, resistor and
  * capacitor voltage
- *Everything is public-API
+ * Everything is public-API
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 0.0033 // 1 s of video = 3.3 ms of circuit

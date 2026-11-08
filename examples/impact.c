@@ -10,9 +10,9 @@
 #include <math.h>
 
 int main(int argc, char **argv) {
-  const double wb = 0.5;   // block width
-  const double hb = 0.4;   // block height
-  const double stem = 0.8; // block's stem
+  const double wb = 0.5; // block
+  const double hb = 0.4; // stem
+  const double stem = 0.8;
   const double R = 0.35;
   const double l = 0.8;
   const double m1 = 1.0;
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
 
   pil_world *w = pil_world_new();
 
-  pil_add_ground(w, (pil_vec2){1.2, hb}, (pil_vec2){-wall, hb}); // rail
+  pil_add_ground(w, (pil_vec2){1.2, hb}, (pil_vec2){-wall, hb}); /* rail */
   pil_add_ground(w, (pil_vec2){-wall, 0.8}, (pil_vec2){-wall, -0.05});
 
   // Stops: two small static posts, spring clears them above

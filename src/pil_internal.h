@@ -144,6 +144,8 @@ struct pil_world {
   int nplots, plcap;
   struct pil_circuit **circuits;
   int ncircuits, ccap;
+  struct pil_lsys **lsys;
+  int nlsys, lscap;
   pil_overlay *overlays;
   int noverlays;
   int ocap;
@@ -221,6 +223,12 @@ void pil_circuits_apply_forces(pil_world *w);
 void pil_circuits_step(pil_world *w, double dt);
 void pil_circuits_reset(pil_world *w);
 void pil_circuits_free(pil_world *w);
+
+/* lagrange.c */
+void pil_lsys_step_all(pil_world *w, double t, double dt);
+void pil_lsys_reset_all(pil_world *w);
+void pil_lsys_free_all(pil_world *w);
+
 /* plot.c */
 void pil_plots_free(pil_world *w);
 /* inelastic velocity impulse when a rope snaps taut while still extending

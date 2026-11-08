@@ -4,6 +4,7 @@
  * springs chain blocks, and diagonal springs couple top row to  bottom row
  * Everything is public-API
  */
+
 #include "example_main.h"
 #include <math.h>
 

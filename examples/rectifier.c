@@ -1,7 +1,7 @@
 /*
  * rectifier.c - half-wave rectifier with a smoothing capacitor
  * v(t) -> diode -> (load R || C); panel shows input and smoothed output
- *Everything is public-API
+ * Everything is public-API
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 0.0167 /* 1 s of video = 16.7 ms of circuit */

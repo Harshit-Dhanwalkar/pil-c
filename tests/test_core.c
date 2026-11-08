@@ -3,6 +3,7 @@
 #include <math.h>
 #include <pil/pil_circuit.h>
 #include <pil/pil_core.h>
+#include <pil/pil_lagrange.h>
 #include <stdio.h>
 
 static int fails = 0;
@@ -47,7 +48,7 @@ static void test_pendulum(void) {
                           .pos = {0.5 * L * sin(th0), -0.5 * L * cos(th0)},
                           .angle = th0 - M_PI / 2});
   pil_add_revolute(w, pil_at(0, 0), pil_on(bar, -0.5 * L, 0));
-  double I = m * L * L / 3.0 + 0.0;    // bar about the hinge (thin)
+  double I = m * L * L / 3.0 + 0.0;    // bar about hinge (thin)
   I = bar->inertia + m * 0.25 * L * L; // exact, includes thickness
   double T = 2 * M_PI * sqrt(I / (m * 9.81 * 0.5 * L));
   double E0 = pil_world_energy(w);
@@ -566,7 +567,7 @@ static void test_circuits(void) {
     pil_node a = pil_circuit_node(c, 0, 1), s = pil_circuit_node(c, 1, 1),
              b = pil_circuit_node(c, 2, 1), g = pil_circuit_node(c, 0, 0);
     pil_circuit_ground(c, g);
-    pil_circuit_set_theta(c, 1.0); /* backward Euler: no ringing at a switch */
+    pil_circuit_set_theta(c, 1.0); // backward Euler: no ringing at a switch
     pil_circuit_set_step(c, 2e-6);
     pil_vsource_dc(c, a, g, 5.0, "V");
     pil_switch(c, a, s, 1e-3, 0, "S");
@@ -637,8 +638,8 @@ static void test_electromechanics(void) {
 
 static void test_stops(void) {
   puts("impact stops");
-  // free mass hits a wall at x = 1 with restitution e: speed -> -e v and lost
-  // kinetic energy is (1 - e^2) m v^2 / 2
+  // free mass hits a wall at x = 1 with restitution e:
+  // speed -> -e v and lost kinetic energy is (1 - e^2) m v^2 / 2
   double es[] = {1.0, 0.6, 0.0};
   for (int i = 0; i < 3; i++) {
     pil_world *w = pil_world_new();
@@ -662,8 +663,8 @@ static void test_stops(void) {
 static void test_circle_contact(void) {
   puts("circle contact (loop-the-loop)");
   double g = 9.81, Rl = 1.0, r = 0.05, D = Rl - r, m = 1.0;
-  /* frictionless disc sliding inside a loop leaves the wall where
-   * cos(phi) = (2 g D - v0^2) / (3 g D), phi measured from the bottom */
+  // frictionless disc sliding inside a loop leaves wall where \cos(\phi) = (2 g
+  // D - v0^2) / (3 g D), \phi measured from bottom
   {
     pil_world *w = pil_world_new();
     pil_body *b =
@@ -683,11 +684,11 @@ static void test_circle_contact(void) {
     check("detachment angle", got, want, 0.12);
     pil_world_free(w);
   }
-  /* rolling without slipping (high mu): bottom speed^2 = 4/3 g h for a solid
-   * disc released from rest at height h above the bottom of the track */
+  // rolling without slipping (high mu): bottom speed^2 = 4/3 g h for a solid
+  // disc released from rest at height h above bottom of track
   {
     pil_world *w = pil_world_new();
-    double th = 1.0; /* start angle from the bottom */
+    double th = 1.0; // start angle from bottom
     pil_body *b = pil_add_body(
         w, &(pil_body_desc){.shape = pil_disc(r),
                             .mass = m,
@@ -702,6 +703,97 @@ static void test_circle_contact(void) {
       }
     }
     check("rolling bottom speed", vmax, sqrt(4.0 / 3.0 * g * h), 0.03);
+    pil_world_free(w);
+  }
+}
+
+typedef struct {
+  double m1, m2, l, k, L0, Om, g;
+} tower_params;
+
+// Block m1 (distance x along an arm turning at Om), pendulum m2 (length l,
+// angle gamma, swinging across arm)
+static double tower_T(const double *q, const double *qd, void *u) {
+  const tower_params *p = u;
+  double x = q[0], xd = qd[0], gd = qd[1], sg = sin(q[1]), cg = cos(q[1]);
+  double t1 = 0.5 * p->m1 * (xd * xd + p->Om * p->Om * x * x);
+  double vx = xd - p->Om * p->l * sg, vy = p->l * cg * gd + p->Om * x,
+         vz = p->l * sg * gd;
+  return t1 + 0.5 * p->m2 * (vx * vx + vy * vy + vz * vz);
+}
+
+static double tower_V(const double *q, void *u) {
+  const tower_params *p = u;
+  return 0.5 * p->k * (q[0] - p->L0) * (q[0] - p->L0) -
+         p->m2 * p->g * p->l * cos(q[1]);
+}
+
+static double pend_T(const double *q, const double *qd, void *u) {
+  (void)q;
+  (void)u;
+  return 0.5 * qd[0] * qd[0];
+}
+
+static double pend_V(const double *q, void *u) {
+  (void)u;
+  return -9.81 * cos(q[0]);
+}
+
+static void test_lagrangian(void) {
+  puts("generalised coordinates (Euler-Lagrange)");
+  // Pendulum, l = 1, m = 1: energy and period (small angle: 2 \pi / \sqrt(g))
+  {
+    pil_world *w = pil_world_new();
+    pil_lsys *s = pil_add_lagrangian(w, 1, pend_T, pend_V, NULL);
+    pil_lsys_set_state(s, (double[]){0.05}, (double[]){0});
+    double T0 = 2 * M_PI / sqrt(9.81), hmax = 0, th_prev = 0.05, tcross = -1;
+    double h0 = pil_lsys_jacobi(s);
+    for (int i = 0; i < 4000; i++) {
+      pil_world_step(w, 1e-3);
+      hmax = fmax(hmax, fabs(pil_lsys_jacobi(s) - h0));
+      double th = pil_lsys_q(s)[0];
+      if (tcross < 0 && th_prev > 0 && th <= 0 && i > 10) {
+        tcross = (i + 1) * 1e-3 + 0; // first zero crossing = T/4
+      }
+      th_prev = th;
+    }
+    check("pendulum energy drift", hmax, 0.0, 1e-8);
+    check("pendulum quarter period", tcross, T0 / 4, 2e-3);
+    pil_world_free(w);
+  }
+  // rotating arm: block sits at x = k L0 / (k - m Om^2) with no pendulum motion
+  // (centrifugal term); stays put for ever
+  {
+    tower_params p = {1.0, 0.0001, 0.5, 60.0, 0.8, 3.0, 9.81};
+    pil_world *w = pil_world_new();
+    pil_lsys *s = pil_add_lagrangian(w, 2, tower_T, tower_V, &p);
+    double xe = p.k * p.L0 / (p.k - (p.m1 + p.m2) * p.Om * p.Om);
+    pil_lsys_set_state(s, (double[]){xe, 0}, (double[]){0, 0});
+    for (int i = 0; i < 2000; i++) {
+      pil_world_step(w, 1e-3);
+    }
+    check("centrifugal equilibrium", pil_lsys_q(s)[0], xe, 2e-4);
+    pil_world_free(w);
+  }
+  // Full tower with Coriolis coupling: Jacobi integral conserved
+  {
+    tower_params p = {1.0, 0.6, 0.5, 60.0, 0.8, 2.0, 9.81};
+    pil_world *w = pil_world_new();
+    pil_lsys *s = pil_add_lagrangian(w, 2, tower_T, tower_V, &p);
+    pil_lsys_set_state(s, (double[]){0.9, 0.7}, (double[]){0.3, -0.5});
+    double h0 = pil_lsys_jacobi(s), dh = 0, xmin = 9, xmax = -9;
+    for (int i = 0; i < 6000; i++) {
+      pil_world_step(w, 1e-3);
+      dh = fmax(dh, fabs(pil_lsys_jacobi(s) - h0));
+      xmin = fmin(xmin, pil_lsys_q(s)[0]);
+      xmax = fmax(xmax, pil_lsys_q(s)[0]);
+    }
+    check("tower Jacobi integral drift", dh, 0.0, 1e-5);
+    check("tower block really moves", xmax - xmin > 0.05 ? 1.0 : 0.0, 1.0,
+          1e-9);
+    // Reset returns to initial state
+    pil_world_reset(w);
+    check("reset restores q", pil_lsys_q(s)[0], 0.9, 1e-12);
     pil_world_free(w);
   }
 }
@@ -726,6 +818,7 @@ int main(void) {
   test_electromechanics();
   test_stops();
   test_circle_contact();
+  test_lagrangian();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

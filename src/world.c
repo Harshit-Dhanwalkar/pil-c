@@ -274,8 +274,6 @@ void pil_world_free(pil_world *w) {
     return;
   }
 
-  pil_circuits_free(w);
-
   for (int i = 0; i < w->nbodies; i++) {
     if (w->bodies[i]->shape.kind == PIL_SHAPE_POLY) {
       free((void *)w->bodies[i]->shape.pts);
@@ -294,6 +292,7 @@ void pil_world_free(pil_world *w) {
   }
   pil_plots_free(w);
   pil_circuits_free(w);
+  pil_lsys_free_all(w);
   free(w->bodies);
   free(w->els);
   free(w->decos);
@@ -375,11 +374,11 @@ void pil_world_step(pil_world *w, double dt) {
   int n = 6 * w->ndyn;
   if (n == 0) {
     if (!w->frozen) {
+      pil_lsys_step_all(w, w->t, dt);
       w->t += dt;
       pil_circuits_step(w, dt);
     }
 
-    pil_circuits_step(w, dt);
     return;
   }
 
@@ -436,12 +435,13 @@ void pil_world_step(pil_world *w, double dt) {
 
   load_state(w, w->tmp);
   if (!w->frozen) {
+    pil_lsys_step_all(w, w->t, dt);
     w->t += dt;
+    pil_circuits_step(w, dt);
   }
 
   w->tcur = w->t;
 
-  pil_circuits_step(w, dt);
   pil_project_rope_snaps(w);
 }
 
@@ -549,6 +549,7 @@ void pil_world_reset(pil_world *w) {
 
   pil_circuits_reset(w);
   pil_elements_rebase(w);
+  pil_lsys_reset_all(w);
 }
 
 void pil_world_settle(pil_world *w, double seconds) {

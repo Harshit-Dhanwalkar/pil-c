@@ -158,6 +158,7 @@ void pil_plots_record(pil_world *w, double sample_dt, double max_dt) {
 
   pil_elements_rebase(w);
   pil_circuits_reset(w); // recording starts at t = 0
+  pil_lsys_reset_all(w);
 }
 
 // Drawing

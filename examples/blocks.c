@@ -1,15 +1,21 @@
 /*
  * blocks.c - two blocks on springs, each carrying a rod pendulum
  * Wall -- k -- m_A -- k -- m_B on a frictionless floor; pendulums l_1, l_2 hang
- * through the floor line. Everything is public-API
+ * through floor line
+ * Everything is public-API
  */
+
 #include "example_main.h"
 #include <math.h>
 
 int main(int argc, char **argv) {
-  const double hb = 0.2, wb = 0.55; // block half-height, width
-  const double l1 = 0.75, l2 = 0.95;
-  const double xa0 = 1.0, xb0 = 2.75; // block centres (initial)
+  const double hb = 0.2;  // block half-height
+  const double wb = 0.55; // block width
+  const double l1 = 0.75;
+  const double l2 = 0.95;
+  // block centres (initial)
+  const double xa0 = 1.0;
+  const double xb0 = 2.75;
 
   pil_world *w = pil_world_new();
 
@@ -35,7 +41,7 @@ int main(int argc, char **argv) {
   pil_element_set_label_at(s0, "k", 0, 22);
   pil_element_set_label_at(s1, "k", 0, 22);
 
-  // pendulums: rigid massless rods from a pin at the block's base
+  // Pendulums: rigid massless rods from a pin at block's base
   double th1 = 0.35, th2 = -0.25;
   pil_body *p1 = pil_add_body(
       w, &(pil_body_desc){.shape = pil_point_mass(0.06),

@@ -585,23 +585,26 @@ static int step_once(pil_circuit *c, double h) {
         }
 
         rhs[e->branch] = vsource_value(e, t1);
-        continue;
+        continue; // branch-row element: skip nodal stamping below
+      }
       }
 
-        if (ia >= 0) {
-          AT(ia, ia) += G;
-          rhs[ia] -= Ik;
-        }
+      // Nodal stamping for two-terminal conductance elements
+      // (R, switch, C, diode, I-source).  L / V / motor / vcoil have already
+      // `continue`d above; the cases above that `break` fall through to here.
+      if (ia >= 0) {
+        AT(ia, ia) += G;
+        rhs[ia] -= Ik;
+      }
 
-        if (ib >= 0) {
-          AT(ib, ib) += G;
-          rhs[ib] += Ik;
-        }
+      if (ib >= 0) {
+        AT(ib, ib) += G;
+        rhs[ib] += Ik;
+      }
 
-        if (ia >= 0 && ib >= 0) {
-          AT(ia, ib) -= G;
-          AT(ib, ia) -= G;
-        }
+      if (ia >= 0 && ib >= 0) {
+        AT(ia, ib) -= G;
+        AT(ib, ia) -= G;
       }
     }
 

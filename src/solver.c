@@ -10,9 +10,10 @@
  * Eliminating a gives (small, dense) Schur system
  *      (J M^-1 J^T) \lambda = J M^-1 F - \gamma
  * solved by Gaussian elimination with partial pivoting.
- * Ropes are handled with a tiny active-set loop (a rope may only pull: tension
- * = +\lambda >= 0, force on body = -J^T \lambda)
+ * Ropes are handled with a tiny active-set loop (a rope may only pull:
+ *  tension = +\lambda >= 0, force on body = -J^T \lambda)
  */
+
 #include "pil_internal.h"
 #include <math.h>
 #include <stddef.h>

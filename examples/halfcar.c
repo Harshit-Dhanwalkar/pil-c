@@ -74,8 +74,8 @@ int main(int argc, char **argv) {
   const double ks[2] = {32000, 38000};
   const double ds[2] = {2400, 2800};
   const char *wl[2] = {"m_1", "m_2"};
-  const double *kl[2] = {"k_1", "k_2"};
-  const double *dl[2] = {"d_1", "d_2"};
+  const char *kl[2] = {"k_1", "k_2"};
+  const char *dl[2] = {"d_1", "d_2"};
   for (int i = 0; i < 2; i++) {
     pil_vec2 p = {xs[i], r + road(xs[i], NULL)};
     pil_body *car =
