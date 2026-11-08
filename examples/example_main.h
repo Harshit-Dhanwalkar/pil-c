@@ -17,6 +17,12 @@
 
 /* An example can slow itself down (circuits live in milliseconds): define
  * PIL_EXAMPLE_TIME_SCALE before including this header */
+// Sim time to run before the still image is drawn, for figures that only show
+// their currents and voltages once running (circuits)
+#ifndef PIL_EXAMPLE_IMAGE_TIME
+#define PIL_EXAMPLE_IMAGE_TIME 0.0
+#endif
+
 #ifndef PIL_EXAMPLE_TIME_SCALE
 #define PIL_EXAMPLE_TIME_SCALE 1.0
 #endif
@@ -26,6 +32,10 @@ static int example_main(pil_world *w, pil_view *view, const char *title,
   pil_style st = pil_style_textbook();
   int rc = 0;
   (void)title; // only used by SDL window
+
+  // dots are specified in px per second of wall time; sim runs slower or faster
+  // by time scale
+  st.current_dot_speed /= PIL_EXAMPLE_TIME_SCALE;
 
   if (argc > 1 && !strcmp(argv[1], "--live")) {
 #ifdef PIL_HAVE_SDL
@@ -77,6 +87,10 @@ static int example_main(pil_world *w, pil_view *view, const char *title,
     }
   } else {
     const char *png = argc > 1 ? argv[1] : default_png;
+    if (PIL_EXAMPLE_IMAGE_TIME > 0) {
+      pil_world_advance(w, PIL_EXAMPLE_IMAGE_TIME, 5e-4);
+    }
+
     rc = pil_export_png(w, view, &st, png);
     printf(rc ? "export failed\n" : "wrote %s\n", png);
   }

@@ -13,6 +13,7 @@
 #include "pil_circuit_draw.h"
 #include <cairo.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 static pil_vec2 node_px(const pil_circuit *c, const pil_view *v, pil_node n) {
@@ -198,13 +199,54 @@ static double symbol_length(const pil_celement *e) {
   return 40;
 }
 
-static void draw_current_dots(cairo_t *cr, pil_vec2 a, pil_vec2 b,
-                              double phase_px, double skip_mid,
+// One flow mark: an arrow head with its tip at (x, y) pointing along (dx, dy),
+// followed by three dots that shrink away behind it
+// Light fill, ink rim, so mark reads over both wire and paper
+static void flow_mark(cairo_t *cr, double x, double y, double dx, double dy,
+                      const pil_style *st) {
+  const double r = st->current_dot_r;
+  cairo_save(cr);
+  cairo_set_line_width(cr, 1.0);
+  cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+  double nx = -dy, ny = dx;
+  double hl = 2.8 * r, hw = 1.5 * r; // head length, half width
+  cairo_move_to(cr, x, y);
+  cairo_line_to(cr, x - dx * hl + nx * hw, y - dy * hl + ny * hw);
+  cairo_line_to(cr, x - dx * hl * 0.75, y - dy * hl * 0.75);
+  cairo_line_to(cr, x - dx * hl - nx * hw, y - dy * hl - ny * hw);
+  cairo_close_path(cr);
+  cairo_set_source_rgb(cr, st->current_color[0], st->current_color[1],
+                       st->current_color[2]);
+  cairo_fill_preserve(cr);
+  cairo_set_source_rgb(cr, st->ink[0], st->ink[1], st->ink[2]);
+  cairo_stroke(cr);
+
+  for (int j = 0; j < 3; j++) {
+    double back = hl + (1.2 + 2.3 * j) * r;
+    double rj = r * (1.0 - 0.18 * j);
+    cairo_arc(cr, x - dx * back, y - dy * back, rj, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, st->current_color[0], st->current_color[1],
+                         st->current_color[2]);
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgb(cr, st->ink[0], st->ink[1], st->ink[2]);
+    cairo_stroke(cr);
+  }
+
+  cairo_restore(cr);
+}
+
+// Current along branch a -> b. phase_px advances with current (it is
+// sign-carrying integral of i / peak), so marks stream towards b for i > 0 and
+// towards a for i < 0, faster for bigger currents. skip_mid keeps symbol in
+// middle clear
+static void draw_current_flow(cairo_t *cr, pil_vec2 a, pil_vec2 b,
+                              double phase_px, double dir, double skip_mid,
                               const pil_style *st) {
   double dx = b.x - a.x;
   double dy = b.y - a.y;
   double L = hypot(dx, dy);
-  if (L < 10) {
+  if (L < 14) {
     return;
   }
 
@@ -212,34 +254,38 @@ static void draw_current_dots(cairo_t *cr, pil_vec2 a, pil_vec2 b,
   double uy = dy / L;
   double mid_lo = (L - skip_mid) * 0.5;
   double mid_hi = mid_lo + skip_mid;
-  const double spacing = 20.0;
-  double off = fmod(phase_px, spacing);
+  const double period = 13.0 * st->current_dot_r;
+  double off = fmod(phase_px, period);
   if (off < 0) {
-    off += spacing;
+    off += period;
   }
 
-  cairo_save(cr);
-  cairo_set_source_rgb(cr, st->ink[0], st->ink[1], st->ink[2]);
-  for (double s = off; s < L; s += spacing) {
-    if (s >= mid_lo && s < mid_hi) {
-      continue; // skip symbol
+  // Mark occupies [tip - extent, tip] along flow
+  // stay inside branch and outside symbol
+  double extent = 10.6 * st->current_dot_r;
+  for (double s = off; s < L + period; s += period) {
+    double lo = dir > 0 ? s - extent : s;
+    double hi = dir > 0 ? s : s + extent;
+    if (lo < 1 || hi > L - 1) {
+      continue;
     }
 
-    double x = a.x + ux * s;
-    double y = a.y + uy * s;
+    if (skip_mid > 0 && hi > mid_lo && lo < mid_hi) {
+      continue;
+    }
 
-    // paper-coloured halo
-    cairo_arc(cr, x, y, 3.2, 0, 2 * M_PI);
-    cairo_set_source_rgb(cr, st->paper[0], st->paper[1], st->paper[2]);
-    cairo_fill(cr);
-
-    // ink dot inside halo
-    cairo_arc(cr, x, y, 1.9, 0, 2 * M_PI);
-    cairo_set_source_rgb(cr, st->ink[0], st->ink[1], st->ink[2]);
-    cairo_fill(cr);
+    flow_mark(cr, a.x + ux * s, a.y + uy * s, ux * dir, uy * dir, st);
   }
+}
 
-  cairo_restore(cr);
+static void voltage_text(char *buf, size_t n, double v) {
+  if (fabs(v) < 5e-4) {
+    snprintf(buf, n, "0 V");
+  } else if (fabs(v) < 1.0) {
+    snprintf(buf, n, "%.0f mV", v * 1e3);
+  } else {
+    snprintf(buf, n, "%.3g V", v);
+  }
 }
 
 static void draw_ground(cairo_t *cr, pil_vec2 p, const pil_style *st) {
@@ -263,9 +309,10 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     abort();
   }
 
-  double anim_scale = (c->peak_i > 1e-12 && st->current_dot_speed > 0)
-                          ? st->current_dot_speed / c->peak_i
-                          : 0;
+  // marks only for currents that matter next to the strongest one
+  double i_min = 2e-3 * c->peak_i;
+  int flowing =
+      st->show_current && c->peak_i > 1e-12 && st->current_dot_speed > 0;
 
   for (int k = 0; k < c->nw; k++) {
     pil_vec2 a = node_px(c, v, c->wires[k].a);
@@ -274,8 +321,10 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     deg[c->wires[k].a]++;
     deg[c->wires[k].b]++;
 
-    if (st->show_current && anim_scale > 0 && fabs(c->wires[k].i) > 1e-9) {
-      draw_current_dots(cr, a, b, c->wires[k].anim_phase * anim_scale, 0, st);
+    if (flowing && fabs(c->wires[k].i) > i_min) {
+      draw_current_flow(cr, a, b,
+                        c->wires[k].anim_phase * st->current_dot_speed,
+                        c->wires[k].i > 0 ? 1 : -1, 0, st);
     }
   }
 
@@ -305,8 +354,9 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
       cairo_restore(cr);
     }
 
-    if (anim_scale > 0 && fabs(e->i) > 1e-9) {
-      draw_current_dots(cr, a, b, e->anim_phase * anim_scale, sl, st);
+    if (flowing && fabs(e->i) > i_min) {
+      draw_current_flow(cr, a, b, e->anim_phase * st->current_dot_speed,
+                        e->i > 0 ? 1 : -1, sl, st);
     }
 
     if (e->kind == CE_MOTOR && !e->hidden) {
@@ -331,6 +381,34 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
       pil_vec2 p = node_px(c, v, n);
       cairo_arc(cr, p.x, p.y, 3.2, 0, 2 * M_PI);
       cairo_fill(cr);
+    }
+  }
+
+  // node voltages at joints, once circuit is running. One label per electrical
+  // node (wires merge nodes) where at least two elements meet
+  if (st->show_voltages && c->peak_i > 1e-12 && c->vn) {
+    int *terms = calloc((size_t)c->nn, sizeof *terms);
+    if (terms) {
+      for (int k = 0; k < c->ne; k++) {
+        terms[pil_cnode_find((pil_circuit *)c, c->els[k]->a)]++;
+        terms[pil_cnode_find((pil_circuit *)c, c->els[k]->b)]++;
+      }
+
+      int gr =
+          c->ground >= 0 ? pil_cnode_find((pil_circuit *)c, c->ground) : -1;
+      for (int n = 0; n < c->nn; n++) {
+        if (pil_cnode_find((pil_circuit *)c, n) != n || n == gr ||
+            terms[n] < 2) {
+          continue;
+        }
+
+        char buf[24];
+        voltage_text(buf, sizeof buf, c->vn[n]);
+        pil_vec2 p = node_px(c, v, n);
+        pil_draw_text(cr, pil_v2(p.x + 6, p.y - 17), buf, 0.0, st);
+      }
+
+      free(terms);
     }
   }
 

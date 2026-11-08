@@ -64,7 +64,9 @@ dist/
 *.mp4
 *.svg
 *.pdf
-!docs/assets/*
+
+# Gallery rendered by tools/gallery.sh
+site/
 
 # Others
 compile_commands.json

@@ -49,10 +49,14 @@ install: $(BUILD)/libpil.a
 	@printf 'prefix=$(PREFIX)\nName: pil\nDescription: textbook physics\nVersion: 0.1\nRequires: cairo\nCflags: -I$${prefix}/include\nLibs: -L$${prefix}/lib -lpil -lm $(if $(HAVE_SDL),-lSDL2)\n' > $(PREFIX)/lib/pkgconfig/pil.pc
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) site
 
 # run each example's built-in sanity check (energy / constraint drift, no NaN)
 check: $(EXAMPLES)
 	@for e in $(EXAMPLES); do echo "== $$e"; $$e --check 5 || exit 1; done
 
-.PHONY: all test check install clean
+# render every example into site/ (gif, mp4, still, index.html); needs ffmpeg
+gallery: all
+	BIN=$(BUILD) sh tools/gallery.sh site
+
+.PHONY: all test check install clean gallery

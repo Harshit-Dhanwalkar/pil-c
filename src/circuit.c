@@ -243,6 +243,23 @@ int pil_circuit_newton_iterations(const pil_circuit *c) {
   return c->newton_iters;
 }
 
+double pil_circuit_node_current_sum(const pil_circuit *c, pil_node n) {
+  int r = pil_cnode_find((pil_circuit *)c, n);
+  double sum = 0;
+  for (int k = 0; k < c->ne; k++) {
+    const pil_celement *e = c->els[k];
+    if (pil_cnode_find((pil_circuit *)c, e->a) == r) {
+      sum += e->i;
+    }
+
+    if (pil_cnode_find((pil_circuit *)c, e->b) == r) {
+      sum -= e->i;
+    }
+  }
+
+  return sum;
+}
+
 double pil_circuit_energy(const pil_circuit *c) {
   double E = 0;
   for (int k = 0; k < c->ne; k++) {
@@ -709,27 +726,18 @@ static int step_once(pil_circuit *c, double h) {
 
     e->v = v;
     e->i = i;
-    e->anim_phase += i * h;
-    // A single bad step should not dominate animation for rest of run - if
-    // accumulated charge is absurd, reset it
-    if (fabs(e->anim_phase) > 1e3) {
-      e->anim_phase = 0;
-    }
-    if (fabs(i) > c->peak_i) {
+    // dots move in proportion to i / peak, so fastest branch always streams at
+    // current_dot_speed whatever circuit's current scale
+    if (fabs(i) > c->peak_i && isfinite(i)) {
       c->peak_i = fabs(i);
     }
-    if (c->peak_i > 1e3) {
-      // Solver transient: don't scale dots to it
-      c->peak_i = 0;
-    }
+
+    e->anim_phase += i / fmax(c->peak_i, 1e-12) * h;
   }
 
   compute_wire_currents(c);
   for (int k = 0; k < c->nw; k++) {
-    c->wires[k].anim_phase += c->wires[k].i * h;
-    if (fabs(c->wires[k].anim_phase) > 1e3) {
-      c->wires[k].anim_phase = 0;
-    }
+    c->wires[k].anim_phase += c->wires[k].i / fmax(c->peak_i, 1e-12) * h;
   }
 
 #undef IA

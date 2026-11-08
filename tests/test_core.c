@@ -798,6 +798,41 @@ static void test_lagrangian(void) {
   }
 }
 
+static void test_kirchhoff(void) {
+  puts("Kirchhoff laws");
+  pil_world *w = pil_world_new();
+  pil_circuit *c = pil_add_circuit(w);
+  pil_node g = pil_circuit_node(c, 0, 0), a = pil_circuit_node(c, 0, 2),
+           x = pil_circuit_node(c, 2, 2), x2 = pil_circuit_node(c, 3, 2),
+           y = pil_circuit_node(c, 3, 0), z = pil_circuit_node(c, 5, 2),
+           zg = pil_circuit_node(c, 5, 0);
+  pil_circuit_ground(c, g);
+  pil_celement *vs = pil_vsource_dc(c, a, g, 12.0, "V");
+  pil_celement *r1 = pil_resistor(c, a, x, 100.0, "R_1");
+  pil_wire(c, x, x2);
+  pil_celement *r2 = pil_resistor(c, x2, y, 300.0, "R_2");
+  pil_celement *r3 = pil_resistor(c, x2, z, 150.0, "R_3");
+  pil_wire(c, y, g);
+  pil_wire(c, zg, g);
+  pil_resistor(c, z, zg, 50.0, "R_4");
+  pil_world_advance(w, 1e-3, 1e-4);
+
+  // KCL at junction and at source's node
+  check("KCL at junction", pil_circuit_node_current_sum(c, x), 0.0, 1e-9);
+  check("KCL at source node", pil_circuit_node_current_sum(c, a), 0.0, 1e-9);
+  // 2 parallel branches carry divider's currents: R3 + R4 = 200
+  double rp = 1.0 / (1.0 / 300.0 + 1.0 / 200.0), itot = 12.0 / (100.0 + rp);
+  check("series current", pil_celement_current(r1), itot, 1e-6);
+  check("divider branch", pil_celement_current(r2), itot * rp / 300.0, 1e-6);
+  check("parallel branch", pil_celement_current(r3), itot * rp / 200.0, 1e-6);
+  // KVL around loop source - R1 - R2
+  check("KVL loop",
+        pil_celement_voltage(vs) -
+            (pil_celement_voltage(r1) + pil_celement_voltage(r2)),
+        0.0, 1e-6);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -819,6 +854,7 @@ int main(void) {
   test_stops();
   test_circle_contact();
   test_lagrangian();
+  test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

@@ -7,6 +7,7 @@
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 0.06 // 1 s of video = 60 ms of motion
+#define PIL_EXAMPLE_IMAGE_TIME 0.03
 #include "example_main.h"
 #include <math.h>
 #include <pil/pil_circuit.h>

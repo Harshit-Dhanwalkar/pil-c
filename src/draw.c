@@ -35,7 +35,10 @@ pil_style pil_style_textbook(void) {
   s.spring_w_px = 10.0;
   s.hinge_r_px = 3.6;
   s.show_current = 1;
-  s.current_dot_speed = 20000.0;
+  s.current_dot_speed = 90.0;
+  s.current_dot_r = 3.4;
+  s.current_color[0] = s.current_color[1] = s.current_color[2] = 0.72;
+  s.show_voltages = 1;
 
   return s;
 }

@@ -43,8 +43,11 @@ typedef struct {
   int upright;        /* set: Latin text in upright face (plot numbers) */
   double spring_w_px; /* default coil half-width in px                  */
   double hinge_r_px;
-  int show_current;         /* draw moving current dots on circuit branches */
-  double current_dot_speed; /* px per amp-second of sim time        */
+  int show_current;         /* animate current: arrows followed by dots     */
+  double current_dot_speed; /* px per second of sim time at the peak current */
+  double current_dot_r;     /* dot radius, px                               */
+  double current_color[3];  /* arrow and dot fill (light grey by default)   */
+  int show_voltages;        /* label node voltages once the circuit runs    */
 } pil_style;
 
 pil_style pil_style_textbook(void);

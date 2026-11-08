@@ -112,6 +112,10 @@ double pil_celement_voltage(const pil_celement *e); /* v(a) - v(b)       */
 double pil_celement_current(const pil_celement *e); /* a -> b through it */
 double pil_celement_power(const pil_celement *e);   /* absorbed v * i    */
 double pil_circuit_node_voltage(const pil_circuit *c, pil_node n);
+/* Kirchhoff's current law: element currents leaving electrical node `n` (all
+ * nodes joined by wires) add up to zero
+ * Returns that sum, a residual of a few 1e-12 A at most */
+double pil_circuit_node_current_sum(const pil_circuit *c, pil_node n);
 double pil_circuit_energy(const pil_circuit *c); /* stored in C and L       */
 int pil_circuit_newton_iterations(const pil_circuit *c); /* of last step */
 
