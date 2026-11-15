@@ -255,6 +255,12 @@ pil_element *pil_add_rotation_drive(pil_world *w, pil_body *a, double omega);
 pil_element *pil_add_rolling(pil_world *w, pil_body *b, pil_vec2 center_local,
                              double radius, pil_vec2 line_point,
                              pil_vec2 line_dir);
+/* Line is attached to another body: `line_point` is an anchor on surface body
+ * (or world) and `line_dir` is in its frame. Surface may move: a disc on a
+ * plank that is itself driven or swinging along */
+pil_element *pil_add_rolling_on(pil_world *w, pil_body *b,
+                                pil_vec2 center_local, double radius,
+                                pil_anchor line_point, pil_vec2 line_dir);
 /* A circle (centre anchor `a`, radius ra, fixed on rolling body) rolls without
  * slipping on a circle (centre anchor `b`, radius rb, fixed on track body or
  * world)
@@ -277,6 +283,12 @@ typedef enum {
 } pil_coord;
 pil_element *pil_add_link(pil_world *w, pil_body *a, pil_coord ca, pil_body *b,
                           pil_coord cb, double ratio);
+/* Prescribed motion of one coordinate of a body: q(t) = fn(t). Velocity and
+ * acceleration of drive are taken by differences of fn, so it only has to be
+ * smooth (an imposed support displacement u(t), a shaker) */
+typedef double (*pil_drive_fn)(double t, void *user);
+pil_element *pil_add_coord_drive(pil_world *w, pil_body *b, pil_coord coord,
+                                 pil_drive_fn fn, void *user);
 /* Unilateral stop on one coordinate of a body (x, y or angle): coordinate may
  * not pass `limit` (upper: q <= limit, otherwise q >= limit). A body arriving
  * at stop is hit by an impulse that reverses its velocity along coordinate with

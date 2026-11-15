@@ -877,6 +877,37 @@ static void test_kirchhoff(void) {
   pil_world_free(w);
 }
 
+static double plank_x(double t, void *u) {
+  (void)u;
+
+  return 0.5 * 2.0 * t * t; // a = 2 m/s^2
+}
+
+static void test_rolling_on_plank(void) {
+  puts("disc rolling on a plank that is driven");
+  // No slip on a plank accelerating at a: friction m a / 3, so a solid disc's
+  // centre accelerates at a / 3 and contact point follows plank
+  pil_world *w = pil_world_new();
+  pil_body *pl = pil_add_body(
+      w, &(pil_body_desc){.shape = pil_rect(2.0, 0.1), .mass = 4.0});
+  pil_add_prismatic(w, pil_on(pl, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
+  pil_add_coord_drive(w, pl, PIL_COORD_X, plank_x, NULL);
+  pil_body *d = pil_add_body(w, &(pil_body_desc){.shape = pil_disc(0.2),
+                                                 .mass = 1.0,
+                                                 .pos = {0.1, 0.25}});
+  pil_add_rolling_on(w, d, (pil_vec2){0, 0}, 0.2, pil_on_at(pl, 0.1, 0.05),
+                     (pil_vec2){1, 0});
+  double x0 = d->pos.x;
+  for (int i = 0; i < 1000; i++) {
+    pil_world_step(w, 1e-3);
+  }
+  check("plank follows drive", pl->pos.x, plank_x(1.0, NULL), 1e-6);
+  check("disc acceleration a/3", d->pos.x - x0, 0.5 * (2.0 / 3.0), 2e-4);
+  check("disc stays on plank", d->pos.y, 0.25, 1e-6);
+  check("constraint error", pil_world_constraint_error(w), 0.0, 1e-6);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -899,6 +930,7 @@ int main(void) {
   test_circle_contact();
   test_lagrangian();
   test_top();
+  test_rolling_on_plank();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

@@ -21,6 +21,7 @@ typedef enum {
   EL_SLOT,
   EL_FIXED_ANGLE,
   EL_ROT_DRIVE,
+  EL_COORD_DRIVE,
   EL_ROLLING,
   EL_CIRCLE_ROLL,
   EL_LINK,
@@ -49,6 +50,7 @@ struct pil_element {
   pil_vec2 f;          /* constant force                                 */
   unsigned flags;
   pil_force_fn fn;
+  double (*dfn)(double t, void *user); /* coordinate drive: q(t)        */
   void *user;
   pil_terrain *terrain;
   double radius;

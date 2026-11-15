@@ -267,18 +267,37 @@ pil_element *pil_add_rotation_drive(pil_world *w, pil_body *a, double omega) {
   return e;
 }
 
-pil_element *pil_add_rolling(pil_world *w, pil_body *b, pil_vec2 center_local,
-                             double radius, pil_vec2 line_point,
-                             pil_vec2 line_dir) {
+pil_element *pil_add_rolling_on(pil_world *w, pil_body *b,
+                                pil_vec2 center_local, double radius,
+                                pil_anchor line_point, pil_vec2 line_dir) {
   pil_element *e = new_el(w, EL_ROLLING);
   e->a.body = b;
   e->a.local = center_local;
   e->radius = radius;
-  e->b = pil_at(line_point.x, line_point.y);
+  e->b = line_point;
   e->dir = unit(line_dir);
   e->hidden = 1;
 
   pil_elements_rebase(w);
+
+  return e;
+}
+
+pil_element *pil_add_rolling(pil_world *w, pil_body *b, pil_vec2 center_local,
+                             double radius, pil_vec2 line_point,
+                             pil_vec2 line_dir) {
+  return pil_add_rolling_on(w, b, center_local, radius,
+                            pil_at(line_point.x, line_point.y), line_dir);
+}
+
+pil_element *pil_add_coord_drive(pil_world *w, pil_body *b, pil_coord coord,
+                                 pil_drive_fn fn, void *user) {
+  pil_element *e = new_el(w, EL_COORD_DRIVE);
+  e->a.body = b;
+  e->ca = coord;
+  e->dfn = fn;
+  e->user = user;
+  e->hidden = 1;
 
   return e;
 }
@@ -426,8 +445,11 @@ void pil_elements_rebase(pil_world *w) {
       e->phase = coord_q(e->a.body, e->ca) - e->k * coord_q(e->b.body, e->cb);
     } else if (e->kind == EL_ROLLING) {
       pil_body *b = e->a.body;
+      pil_body *s = e->b.body;
       pil_vec2 C = pil_anchor_world(e->a);
-      e->phase = v_dot(e->dir, v_sub(C, e->b.local)) + e->radius * b->angle;
+      pil_vec2 u = v_rot(e->dir, s ? s->angle : 0.0);
+      e->phase = v_dot(u, v_sub(C, pil_anchor_world(e->b))) +
+                 e->radius * (b->angle - (s ? s->angle : 0.0));
     }
   }
 }
@@ -919,31 +941,62 @@ int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
   }
 
   case EL_ROLLING: {
+    // Circle keeps distance R from a line fixed in surface body S and does not
+    // slip along it: u . (C - P) + R (theta - theta_S) = const, with u and n
+    // line directions turned by S (S may be world)
     pil_body *b = e->a.body;
     pil_vec2 rC = pil_anchor_r(e->a);
-    pil_vec2 C = pil_anchor_world(e->a);
-    pil_vec2 vC = pil_anchor_vel(e->a);
-    pil_vec2 u = e->dir, n = v_perp(u);
-    pil_vec2 dC = v_sub(C, e->b.local);
+    pil_vec2 rP = pil_anchor_r(e->b);
+    pil_vec2 d = v_sub(pil_anchor_world(e->a), pil_anchor_world(e->b));
+    pil_vec2 dd = v_sub(pil_anchor_vel(e->a), pil_anchor_vel(e->b));
+    pil_vec2 u = v_rot(e->dir, e->b.body ? e->b.body->angle : 0.0);
+    pil_vec2 n = v_perp(u);
 
-    double w2 = b->omega * b->omega;
+    double wS = a_omega(e->b);
+    double wd = b->omega;
     double R = e->radius;
+    double ud = v_dot(u, d);
 
-    rows[0].phi = v_dot(n, dC) - R;
-    rows[0].vel = v_dot(n, vC);
+    rows[0].phi = v_dot(n, d) - R;
+    rows[0].vel = -wS * ud + v_dot(n, dd);
     rows[0].ja[0] = n.x;
     rows[0].ja[1] = n.y;
     rows[0].ja[2] = v_cross(rC, n);
-    finish(e, &rows[0], w2 * v_dot(n, rC));
+    rows[0].jb[0] = -n.x;
+    rows[0].jb[1] = -n.y;
+    rows[0].jb[2] = -v_cross(rP, n) - ud;
+    finish(e, &rows[0],
+           wS * wS * v_dot(n, d) + 2 * wS * v_dot(u, dd) +
+               wd * wd * v_dot(n, rC) - wS * wS * v_dot(n, rP));
 
-    rows[1].phi = v_dot(u, dC) + R * b->angle - e->phase;
-    rows[1].vel = v_dot(u, vC) + R * b->omega;
+    rows[1].phi =
+        ud + R * (b->angle - (e->b.body ? e->b.body->angle : 0.0)) - e->phase;
+    rows[1].vel = wS * v_dot(n, d) + v_dot(u, dd) + R * (wd - wS);
     rows[1].ja[0] = u.x;
     rows[1].ja[1] = u.y;
     rows[1].ja[2] = v_cross(rC, u) + R;
-    finish(e, &rows[1], w2 * v_dot(u, rC));
+    rows[1].jb[0] = -u.x;
+    rows[1].jb[1] = -u.y;
+    rows[1].jb[2] = -v_cross(rP, u) + v_dot(n, d) - R;
+    finish(e, &rows[1],
+           wS * wS * ud - 2 * wS * v_dot(n, dd) + wd * wd * v_dot(u, rC) -
+               wS * wS * v_dot(u, rP));
 
     return 2;
+  }
+
+  case EL_COORD_DRIVE: {
+    const double h = 1e-3;
+    double f0 = e->dfn(t, e->user);
+    double fp = e->dfn(t + h, e->user);
+    double fm = e->dfn(t - h, e->user);
+
+    rows[0].phi = coord_q(e->a.body, e->ca) - f0;
+    rows[0].vel = coord_v(e->a.body, e->ca) - (fp - fm) / (2 * h);
+    rows[0].ja[e->ca] = 1;
+    finish(e, &rows[0], (fp - 2 * f0 + fm) / (h * h));
+
+    return 1;
   }
 
   default:

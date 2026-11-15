@@ -959,7 +959,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   for (int i = 0; i < w->ndecos; i++) {
     if (w->decos[i]->kind == D_ENERGY_BAR) {
       draw_energy_bar(cr, w, w->decos[i], v, st);
-    } else if (w->decos[i]->kind != D_GROUND) {
+    } else if (w->decos[i]->kind == D_GROUND) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }

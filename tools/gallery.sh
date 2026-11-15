@@ -27,6 +27,7 @@ impact|8|Impact oscillator with a pendulum
 loop|5|Loop-the-loop
 tower|8|Rotating tower with a sliding block and a pendulum (Lagrangian)
 top|4|Heavy symmetric top: precession and nutation
+linkage|6|Parallelogram linkage with a rolling disc, slider and double pendulum
 rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
 motor|5|DC motor driving a flywheel
