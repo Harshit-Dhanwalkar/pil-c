@@ -25,6 +25,7 @@ pulleys|6|Pulley system
 swing|8|Swinging Atwood machine with energy plot
 impact|8|Impact oscillator with a pendulum
 loop|5|Loop-the-loop
+tower|8|Rotating tower with a sliding block and a pendulum (Lagrangian)
 rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
 motor|5|DC motor driving a flywheel
