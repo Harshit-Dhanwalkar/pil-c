@@ -798,6 +798,50 @@ static void test_lagrangian(void) {
   }
 }
 
+typedef struct {
+  double I1, I3, m, l, g;
+} top_params;
+
+static double top_T(const double *q, const double *qd, void *u) {
+  const top_params *p = u;
+  double st = sin(q[1]);
+  double w3 = qd[2] + qd[0] * cos(q[1]);
+
+  return 0.5 * p->I1 * (qd[1] * qd[1] + qd[0] * qd[0] * st * st) +
+         0.5 * p->I3 * w3 * w3;
+}
+
+static double top_V(const double *q, void *u) {
+  const top_params *p = u;
+
+  return p->m * p->g * p->l * cos(q[1]);
+}
+
+static void test_top(void) {
+  puts("heavy symmetric top (Euler angles)");
+  top_params p = {0.03, 0.01, 1.0, 0.3, 9.81};
+  pil_world *w = pil_world_new();
+  pil_lsys *s = pil_add_lagrangian(w, 3, top_T, top_V, &p);
+  pil_lsys_set_state(s, (double[]){2.3, 0.7, 0.0}, (double[]){4.2, 0.0, 70.0});
+  const double *q = pil_lsys_q(s);
+  const double *qd = pil_lsys_qd(s);
+  double ppsi0 = p.I3 * (qd[2] + qd[0] * cos(q[1]));
+  double pphi0 = p.I1 * qd[0] * sin(q[1]) * sin(q[1]) + ppsi0 * cos(q[1]);
+  double h0 = pil_lsys_jacobi(s), dpsi = 0, dphi = 0, dh = 0;
+  for (int i = 0; i < 4000; i++) {
+    pil_world_step(w, 1e-3);
+    double ppsi = p.I3 * (qd[2] + qd[0] * cos(q[1]));
+    double pphi = p.I1 * qd[0] * sin(q[1]) * sin(q[1]) + ppsi * cos(q[1]);
+    dpsi = fmax(dpsi, fabs(ppsi - ppsi0));
+    dphi = fmax(dphi, fabs(pphi - pphi0));
+    dh = fmax(dh, fabs(pil_lsys_jacobi(s) - h0));
+  }
+  check("p_psi conserved", dpsi, 0.0, 1e-6);
+  check("p_phi conserved", dphi, 0.0, 1e-6);
+  check("energy conserved", dh, 0.0, 1e-5);
+  pil_world_free(w);
+}
+
 static void test_kirchhoff(void) {
   puts("Kirchhoff laws");
   pil_world *w = pil_world_new();
@@ -854,6 +898,7 @@ int main(void) {
   test_stops();
   test_circle_contact();
   test_lagrangian();
+  test_top();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
