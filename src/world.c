@@ -285,6 +285,7 @@ void pil_world_free(pil_world *w) {
     free(w->els[i]);
   }
   for (int i = 0; i < w->ndecos; i++) {
+    free(w->decos[i]->pts);
     free(w->decos[i]);
   }
   for (int i = 0; i < w->nterr; i++) {
@@ -377,6 +378,7 @@ void pil_world_step(pil_world *w, double dt) {
       pil_lsys_step_all(w, w->t, dt);
       w->t += dt;
       pil_circuits_step(w, dt);
+      pil_traces_record(w);
     }
 
     return;
@@ -438,6 +440,7 @@ void pil_world_step(pil_world *w, double dt) {
     pil_lsys_step_all(w, w->t, dt);
     w->t += dt;
     pil_circuits_step(w, dt);
+    pil_traces_record(w);
   }
 
   w->tcur = w->t;
@@ -550,6 +553,7 @@ void pil_world_reset(pil_world *w) {
   pil_circuits_reset(w);
   pil_elements_rebase(w);
   pil_lsys_reset_all(w);
+  pil_traces_clear(w);
 }
 
 void pil_world_settle(pil_world *w, double seconds) {
@@ -582,6 +586,7 @@ void pil_world_settle(pil_world *w, double seconds) {
 
   pil_world_snapshot(w);
   pil_elements_rebase(w);
+  pil_traces_clear(w);
 }
 
 // picking / grabbing
@@ -736,6 +741,76 @@ pil_deco *pil_add_arrow(pil_world *w, pil_anchor from, double dx, double dy,
   d->a = from;
   d->dx = dx;
   d->dy = dy;
+
+  return d;
+}
+
+static void trace_push(pil_deco *d, pil_vec2 p) {
+  if (d->npts == d->maxpts) {
+    memmove(d->pts, d->pts + 1, (size_t)(d->maxpts - 1) * sizeof *d->pts);
+    d->npts--;
+  }
+
+  d->pts[d->npts++] = p;
+}
+
+void pil_traces_record(pil_world *w) {
+  for (int i = 0; i < w->ndecos; i++) {
+    pil_deco *d = w->decos[i];
+    if (d->kind == D_TRACE && w->t >= d->next_t) {
+      trace_push(d, pil_anchor_world(d->a));
+      d->next_t = w->t + d->dt;
+    }
+  }
+}
+
+void pil_traces_clear(pil_world *w) {
+  for (int i = 0; i < w->ndecos; i++) {
+    pil_deco *d = w->decos[i];
+    if (d->kind == D_TRACE) {
+      d->npts = 0;
+      d->next_t = 0;
+      pil_traces_record(w);
+    }
+  }
+}
+
+pil_deco *pil_add_trace(pil_world *w, pil_anchor at, double sample_dt,
+                        int max_points) {
+  pil_deco *d = new_deco(w, D_TRACE, "");
+  d->a = at;
+  d->dt = sample_dt;
+  d->maxpts = max_points < 2 ? 2 : max_points;
+  d->pts = malloc((size_t)d->maxpts * sizeof *d->pts);
+  if (!d->pts) {
+    abort();
+  }
+
+  trace_push(d, pil_anchor_world(at));
+  d->next_t = w->t + sample_dt;
+
+  return d;
+}
+
+int pil_trace_count(const pil_deco *trace) {
+  return trace && trace->kind == D_TRACE ? trace->npts : 0;
+}
+
+pil_vec2 pil_trace_point(const pil_deco *trace, int i) {
+  if (!trace || trace->kind != D_TRACE || i < 0 || i >= trace->npts) {
+    return pil_v2(0, 0);
+  }
+
+  return trace->pts[i];
+}
+
+pil_deco *pil_add_vector(pil_world *w, pil_anchor at, pil_vec_kind kind,
+                         double px_per_unit, unsigned flags, const char *text) {
+  pil_deco *d = new_deco(w, D_VECTOR, text);
+  d->a = at;
+  d->vkind = (int)kind;
+  d->vflags = flags;
+  d->dx = px_per_unit;
 
   return d;
 }

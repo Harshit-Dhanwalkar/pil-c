@@ -489,7 +489,7 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
   pil_vec2 c0 = v_add(b->pos, v_rot(s->offset, b->angle));
   cairo_new_path(cr);
   switch (s->kind) {
-  case PIL_SHAPE_RECT:
+  case PIL_SHAPE_RECT: {
     for (int i = 0; i < 4; i++) {
       static const int cx[4] = {-1, 1, 1, -1}, cy[4] = {-1, -1, 1, 1};
       pil_vec2 p =
@@ -503,7 +503,8 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
     }
     cairo_close_path(cr);
     break;
-  case PIL_SHAPE_POLY:
+  }
+  case PIL_SHAPE_POLY: {
     for (int i = 0; i < s->npts; i++) {
       pil_vec2 p = S(v, v_add(c0, v_rot(s->pts[i], b->angle)));
       if (i == 0) {
@@ -514,6 +515,7 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
     }
     cairo_close_path(cr);
     break;
+  }
   case PIL_SHAPE_DISC: {
     pil_vec2 c = S(v, c0);
     cairo_arc(cr, c.x, c.y, s->r * v->scale, 0, TWO_PI);
@@ -720,6 +722,85 @@ static void draw_terrain(cairo_t *cr, const pil_terrain *t, double time,
     cairo_line_to(cr, p.x - 7, p.y + 8);
     cairo_stroke(cr);
   }
+
+  cairo_restore(cr);
+}
+
+// Velocity, acceleration or net force at an anchor, from body state
+static pil_vec2 vector_value(const pil_deco *d) {
+  pil_body *b = d->a.body;
+  pil_vec2 r = pil_anchor_r(d->a);
+  switch (d->vkind) {
+  case PIL_VEC_ACCELERATION: {
+    if (!b) {
+      return pil_v2(0, 0);
+    }
+
+    // a_P = a + alpha x r - omega^2 r
+    return pil_v2(b->acc.x - b->alpha * r.y - b->omega * b->omega * r.x,
+                  b->acc.y + b->alpha * r.x - b->omega * b->omega * r.y);
+  }
+  case PIL_VEC_FORCE: {
+    return b ? pil_v2(b->mass * b->acc.x, b->mass * b->acc.y) : pil_v2(0, 0);
+  }
+  default: {
+    return pil_anchor_vel(d->a);
+  }
+  }
+}
+
+static void draw_vector(cairo_t *cr, const pil_deco *d, const pil_view *v,
+                        const pil_style *st) {
+  pil_vec2 val = vector_value(d);
+  double px = val.x * d->dx;
+  double py = val.y * d->dx;
+  double L = sqrt(px * px + py * py);
+  if (L < 3.0) {
+    return;
+  }
+
+  if (L > 420.0) {
+    px *= 420.0 / L;
+    py *= 420.0 / L;
+  }
+
+  pil_vec2 A = S(v, pil_anchor_world(d->a));
+  pil_vec2 T = pil_v2(A.x + px, A.y - py);
+  char buf[64];
+
+  cairo_save(cr);
+  ink(cr, st);
+  if (d->vflags & PIL_VEC_COMPONENTS) {
+    pil_vec2 X = pil_v2(A.x + px, A.y);
+    pil_vec2 Y = pil_v2(A.x, A.y - py);
+    cairo_set_line_width(cr, st->thin_w);
+    double dash[] = {3.0, 3.0};
+    cairo_set_dash(cr, dash, 2, 0);
+    cairo_move_to(cr, X.x, X.y);
+    cairo_line_to(cr, T.x, T.y);
+    cairo_move_to(cr, Y.x, Y.y);
+    cairo_line_to(cr, T.x, T.y);
+    cairo_stroke(cr);
+    cairo_set_dash(cr, NULL, 0, 0);
+    pil_draw_arrow(cr, A, X, 7, st);
+    pil_draw_arrow(cr, A, Y, 7, st);
+    if (d->text[0]) {
+      snprintf(buf, sizeof buf, "%.40s_x", d->text);
+      pil_draw_text(cr, pil_v2(X.x, X.y + 14), buf, 0.5, st);
+      snprintf(buf, sizeof buf, "%.40s_y", d->text);
+      pil_draw_text(cr, pil_v2(Y.x - 8, Y.y), buf, 1.0, st);
+    }
+  }
+
+  cairo_set_line_width(cr, st->line_w);
+  pil_draw_arrow(cr, A, T, 10, st);
+  if (d->text[0]) {
+    double ux = px / L;
+    double uy = -py / L;
+    pil_draw_text(cr, pil_v2(T.x + ux * 10, T.y + uy * 10), d->text,
+                  ux < -0.3 ? 1.0 : (ux > 0.3 ? 0.0 : 0.5), st);
+  }
+
   cairo_restore(cr);
 }
 
@@ -733,14 +814,43 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
   pil_vec2 A = S(v, pil_anchor_world(d->a));
   pil_vec2 B = S(v, pil_anchor_world(d->b));
   switch (d->kind) {
-  case D_LABEL:
+  case D_TRACE: {
+    if (d->npts < 2) {
+      break;
+    }
+
+    cairo_save(cr);
+    ink(cr, st);
+    cairo_set_line_width(cr, st->thin_w);
+    double dash[] = {5.0, 4.0};
+    cairo_set_dash(cr, dash, 2, 0);
+    for (int i = 0; i < d->npts; i++) {
+      pil_vec2 p = S(v, d->pts[i]);
+      if (i == 0) {
+        cairo_move_to(cr, p.x, p.y);
+      } else {
+        cairo_line_to(cr, p.x, p.y);
+      }
+    }
+
+    cairo_stroke(cr);
+    cairo_restore(cr);
+    break;
+  }
+  case D_VECTOR: {
+    draw_vector(cr, d, v, st);
+    break;
+  }
+  case D_LABEL: {
     pil_draw_text(cr, pil_v2(A.x + d->dx, A.y - d->dy), d->text,
                   align_for(d->dx), st);
     break;
-  case D_GROUND:
+  }
+  case D_GROUND: {
     pil_draw_hatch(cr, A, B, st);
     break;
-  case D_GRAVITY:
+  }
+  case D_GRAVITY: {
     if (d->ref != 0) { // gravity into page: "g (x)"
       const double r = 7.5;
       const double cx = A.x + 14;
@@ -762,7 +872,8 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     pil_draw_arrow(cr, A, pil_v2(A.x, A.y + 38), 10, st);
     pil_draw_text(cr, pil_v2(A.x + 9, A.y + 14), d->text, 0.0, st);
     break;
-  case D_LINE:
+  }
+  case D_LINE: {
     cairo_save(cr);
     ink(cr, st);
     cairo_set_line_width(cr, st->thin_w * 0.9);
@@ -775,6 +886,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     cairo_stroke(cr);
     cairo_restore(cr);
     break;
+  }
   case D_ARROW: {
     pil_vec2 T = pil_v2(A.x + d->dx, A.y - d->dy);
     if (d->reverse) {
@@ -959,7 +1071,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   for (int i = 0; i < w->ndecos; i++) {
     if (w->decos[i]->kind == D_ENERGY_BAR) {
       draw_energy_bar(cr, w, w->decos[i], v, st);
-    } else if (w->decos[i]->kind == D_GROUND) {
+    } else if (w->decos[i]->kind == D_GROUND || w->decos[i]->kind == D_TRACE) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }
@@ -988,7 +1100,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   }
 
   for (int i = 0; i < w->ndecos; i++) {
-    if (w->decos[i]->kind != D_GROUND) {
+    if (w->decos[i]->kind != D_GROUND && w->decos[i]->kind != D_TRACE) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }

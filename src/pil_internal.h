@@ -74,11 +74,15 @@ typedef enum {
   D_GROUND,
   D_GRAVITY,
   D_ANGLE_PTS,
-  D_ENERGY_BAR
+  D_ENERGY_BAR,
+  D_TRACE,
+  D_VECTOR
 } pil_deco_kind;
 struct pil_deco {
   pil_deco_kind kind;
-  pil_anchor a, b, c;
+  pil_anchor a;
+  pil_anchor b;
+  pil_anchor c;
   double dx;
   double dy;
   double offset;
@@ -89,6 +93,13 @@ struct pil_deco {
   int reverse;
   pil_body *body;
   char text[48];
+  /* trace: sampled path; vector: kind and scale */
+  pil_vec2 *pts;
+  int npts, maxpts;
+  double next_t;
+  double dt;
+  int vkind;
+  unsigned vflags;
 };
 
 struct pil_terrain {
@@ -201,6 +212,10 @@ static inline pil_vec2 v_rot(pil_vec2 a, double th) {
  * velocity */
 pil_vec2 pil_anchor_r(pil_anchor a);
 pil_vec2 pil_anchor_vel(pil_anchor a);
+
+/* world.c: sample traces after a step, clear them on reset */
+void pil_traces_record(pil_world *w);
+void pil_traces_clear(pil_world *w);
 
 /* elements.c */
 /* Fills up to 2 rows; returns row count. A slack rope returns 0 unless

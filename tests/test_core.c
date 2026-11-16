@@ -842,6 +842,25 @@ static void test_top(void) {
   pil_world_free(w);
 }
 
+static void test_trace(void) {
+  puts("traces");
+  pil_world *w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.05),
+                                                 .mass = 1.0,
+                                                 .pos = {0, 0},
+                                                 .vel = {2.0, 0}});
+  pil_deco *tr = pil_add_trace(w, pil_on(b, 0, 0), 0.1, 100);
+  pil_world_advance(w, 1.0, 1e-3);
+  check("sample count", pil_trace_count(tr), 11, 1.5);
+  check("first point", pil_trace_point(tr, 0).x, 0.0, 1e-9);
+  check("last point", pil_trace_point(tr, pil_trace_count(tr) - 1).x, 2.0,
+        0.03);
+  pil_world_reset(w);
+  check("cleared on reset", pil_trace_count(tr), 1, 0.5);
+  pil_world_free(w);
+}
+
 static void test_kirchhoff(void) {
   puts("Kirchhoff laws");
   pil_world *w = pil_world_new();
@@ -931,6 +950,7 @@ int main(void) {
   test_lagrangian();
   test_top();
   test_rolling_on_plank();
+  test_trace();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

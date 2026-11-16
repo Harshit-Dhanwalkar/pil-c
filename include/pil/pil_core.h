@@ -358,6 +358,27 @@ pil_deco *pil_add_dimension(pil_world *w, pil_anchor a, pil_anchor b,
 pil_deco *pil_add_arrow(pil_world *w, pil_anchor from, double dx_px,
                         double dy_px, const char *text);
 pil_deco *pil_add_line(pil_world *w, pil_anchor a, pil_anchor b, int dash_dot);
+/* Path of a body-fixed point, drawn as a thin dashed line (projectile arc,
+ * cycloid, orbit). Sampled every `sample_dt` seconds of simulated time, keeps
+ * last `max_points`, cleared by pil_world_reset */
+pil_deco *pil_add_trace(pil_world *w, pil_anchor at, double sample_dt,
+                        int max_points);
+/* Read a trace back (export to a plot, compare with theory) */
+int pil_trace_count(const pil_deco *trace);
+pil_vec2 pil_trace_point(const pil_deco *trace, int i);
+/* Live vector drawn at an anchor from body state: velocity of that point,
+ * acceleration of that point, or net force m*a on its body. `px_per_unit`
+ * scales length on screen (pixels per m/s, m/s^2 or N); with
+ * PIL_VEC_COMPONENTS its x and y components are drawn thin beside it, labelled
+ * text_x and text_y */
+typedef enum {
+  PIL_VEC_VELOCITY = 0,
+  PIL_VEC_ACCELERATION,
+  PIL_VEC_FORCE
+} pil_vec_kind;
+enum { PIL_VEC_COMPONENTS = 1 };
+pil_deco *pil_add_vector(pil_world *w, pil_anchor at, pil_vec_kind kind,
+                         double px_per_unit, unsigned flags, const char *text);
 /* Leader line with arrowhead touching `at`; label sits at far end
  * (dx,dy pixels from `at`, dy up) - "M" pointer of textbook figures */
 pil_deco *pil_add_leader(pil_world *w, pil_anchor at, double dx_px,
