@@ -228,6 +228,17 @@ pil_element *pil_add_gravity_pair(pil_world *w, pil_body *a, pil_body *b,
 pil_element *pil_add_coulomb(pil_world *w, pil_body *a, double qa, pil_body *b,
                              double qb, double k_e);
 
+/* Drag on a body's centre of mass: F = -lin v - quad |v| v (N s/m, N s^2/m^2)
+ * Dissipative, so it is not part of energy balance */
+pil_element *pil_add_drag(pil_world *w, pil_body *b, double lin, double quad);
+/* Charge q (C) in a uniform field: F = q (E + v x B), B along z (out of  page
+ * for bz > 0) Magnetic part does no work, electric part adds potential -q E.x
+ * to energy Fields may be set again later with pil_lorentz_set_fields (e.g. a
+ * ramped or reversed field) */
+pil_element *pil_add_lorentz(pil_world *w, pil_body *b, double q, double ex,
+                             double ey, double bz);
+void pil_lorentz_set_fields(pil_element *e, double ex, double ey, double bz);
+
 typedef void (*pil_force_fn)(pil_world *w, double t, void *user);
 /* Escape hatch: your callback may call pil_apply_force / pil_apply_torque. */
 pil_element *pil_add_custom_force(pil_world *w, pil_force_fn fn, void *user);
@@ -387,6 +398,16 @@ pil_deco *pil_add_sweep(pil_world *w, pil_anchor center, pil_anchor point,
 pil_deco *pil_add_sweep_window(pil_world *w, pil_anchor center,
                                pil_anchor point, double t0, double t1,
                                double sample_dt);
+/* Field illustration over rectangle lo..hi: a grid (pitch `spacing`, m) of
+ * symbols, drawn behind the bodies
+ * PIL_FIELD_B: dots (out of the page) for vx > 0, crosses (into the page) for
+ * vx < 0
+ * PIL_FIELD_E: arrows along (vx, vy)
+ * Pure decoration: pair it with pil_add_lorentz for the physics */
+typedef enum { PIL_FIELD_B = 0, PIL_FIELD_E } pil_field_kind;
+pil_deco *pil_add_field_marks(pil_world *w, pil_vec2 lo, pil_vec2 hi,
+                              double spacing, pil_field_kind kind, double vx,
+                              double vy);
 /* Read a trace back (export to a plot, compare with theory) */
 int pil_trace_count(const pil_deco *trace);
 pil_vec2 pil_trace_point(const pil_deco *trace, int i);

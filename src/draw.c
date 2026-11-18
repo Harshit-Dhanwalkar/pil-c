@@ -841,6 +841,62 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     draw_vector(cr, d, v, st);
     break;
   }
+  case D_FIELD: {
+    double sp = d->dt * v->scale;
+    if (sp < 6.0) {
+      break;
+    }
+
+    double x0 = fmin(A.x, B.x), x1 = fmax(A.x, B.x);
+    double y0 = fmin(A.y, B.y), y1 = fmax(A.y, B.y);
+    cairo_save(cr);
+    ink(cr, st);
+    cairo_set_line_width(cr, st->thin_w);
+    // whole number of cells each way, centred in the rectangle
+    int nx = (int)floor((x1 - x0) / sp + 1e-9);
+    int ny = (int)floor((y1 - y0) / sp + 1e-9);
+    double ox = x0 + 0.5 * ((x1 - x0) - nx * sp) + 0.5 * sp;
+    double oy = y0 + 0.5 * ((y1 - y0) - ny * sp) + 0.5 * sp;
+    for (int iy = 0; iy < ny; iy++) {
+      for (int ix = 0; ix < nx; ix++) {
+        double x = ox + ix * sp;
+        double y = oy + iy * sp;
+        if (d->vkind == PIL_FIELD_B) {
+          double r = 0.14 * sp;
+          cairo_new_sub_path(cr);
+          cairo_arc(cr, x, y, r, 0, TWO_PI);
+          cairo_stroke(cr);
+          if (d->dx > 0) {
+            cairo_arc(cr, x, y, 0.28 * r + 0.5, 0, TWO_PI);
+            cairo_fill(cr);
+          } else {
+            cairo_move_to(cr, x - 0.7 * r, y - 0.7 * r);
+            cairo_line_to(cr, x + 0.7 * r, y + 0.7 * r);
+            cairo_move_to(cr, x - 0.7 * r, y + 0.7 * r);
+            cairo_line_to(cr, x + 0.7 * r, y - 0.7 * r);
+            cairo_stroke(cr);
+          }
+        } else {
+          double L = sqrt(d->dx * d->dx + d->dy * d->dy);
+          if (L < 1e-12) {
+            continue;
+          }
+
+          double hl = 0.25 * sp;
+          pil_vec2 from = pil_v2(x - hl * d->dx / L, y + hl * d->dy / L);
+          pil_vec2 to = pil_v2(x + hl * d->dx / L, y - hl * d->dy / L);
+          pil_draw_arrow(cr, from, to, 6, st);
+        }
+      }
+    }
+
+    cairo_rectangle(cr, x0, y0, x1 - x0, y1 - y0);
+    double dash[] = {6.0, 4.0};
+    cairo_set_dash(cr, dash, 2, 0);
+    cairo_stroke(cr);
+    cairo_restore(cr);
+    break;
+  }
   case D_SWEEP: {
     if (d->npts < 2) {
       break;
@@ -1094,7 +1150,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
     if (w->decos[i]->kind == D_ENERGY_BAR) {
       draw_energy_bar(cr, w, w->decos[i], v, st);
     } else if (w->decos[i]->kind == D_GROUND || w->decos[i]->kind == D_TRACE ||
-               w->decos[i]->kind == D_SWEEP) {
+               w->decos[i]->kind == D_SWEEP || w->decos[i]->kind == D_FIELD) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }
@@ -1124,7 +1180,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
 
   for (int i = 0; i < w->ndecos; i++) {
     if (w->decos[i]->kind != D_GROUND && w->decos[i]->kind != D_TRACE &&
-        w->decos[i]->kind != D_SWEEP) {
+        w->decos[i]->kind != D_SWEEP && w->decos[i]->kind != D_FIELD) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }

@@ -16,6 +16,8 @@ typedef enum {
   EL_FORCE,
   EL_CUSTOM,
   EL_TERRAIN_CONTACT,
+  EL_DRAG,
+  EL_LORENTZ,
   EL_PAIR,
   EL_REVOLUTE,
   EL_DISTANCE,
@@ -78,7 +80,8 @@ typedef enum {
   D_ENERGY_BAR,
   D_TRACE,
   D_VECTOR,
-  D_SWEEP
+  D_SWEEP,
+  D_FIELD
 } pil_deco_kind;
 struct pil_deco {
   pil_deco_kind kind;

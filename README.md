@@ -57,13 +57,13 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 
 # other examples
 ## mechanics
-./build/atwood  ./build/blocks    ./build/bowl       ./build/crank
-./build/cycloid ./build/frame     ./build/impact     ./build/incline
-./build/kepler  ./build/linkage   ./build/loop       ./build/projectile
-./build/pulleys ./build/ring      ./build/swing      ./build/tower
-./build/top     ./build/shaker
+./build/atwood    ./build/blocks    ./build/bowl       ./build/crank
+./build/cycloid   ./build/frame     ./build/impact     ./build/incline
+./build/kepler    ./build/linkage   ./build/loop       ./build/projectile
+./build/pulleys   ./build/ring      ./build/swing      ./build/tower
+./build/top       ./build/shaker
 ## Electrodynamics / circuits
-./build/rlc     ./build/rectifier ./build/motor
+./build/cyclotron ./build/rlc     ./build/rectifier ./build/motor
 
 make gallery
 ```
@@ -112,25 +112,24 @@ int main(void)
 - **Elements** are what you drop in. Force elements add forces; constraints remove
   degrees of freedom.
 
-| you want                             | call                                                        |
-| ------------------------------------ | ----------------------------------------------------------- |
-| spring / damper                      | `pil_add_spring`, `pil_add_damper`                          |
-| torsional spring (+damper)           | `pil_add_torsion_spring`                                    |
-| constant force / "pull"              | `pil_add_force`                                             |
-| any force law you like               | `pil_add_custom_force(fn)` - call `pil_apply_force` inside  |
-| pin / hinge                          | `pil_add_revolute`                                          |
-| rigid rod / rope                     | `pil_add_distance(..., 0)` / `(..., PIL_ROPE)`              |
-| rope over a pulley                   | `pil_add_pulley_rope` (+ a static disc body for the pulley) |
-| sliding guide, rail                  | `pil_add_slot`, `pil_add_prismatic` (slot + fixed angle)    |
-| lock an angle / motor                | `pil_add_fixed_angle`, `pil_add_rotation_drive`             |
-| roll without slipping on a line      | `pil_add_rolling` (discs, cylinders, arc bands)             |
-| block/wedge/floor contact + friction | `pil_add_floor_contact` (line may belong to a moving body)  |
-| uneven moving road                   | `pil_add_terrain` + `pil_add_terrain_contact`               |
-| belt, gears, rack: two coordinates tied by a ratio | `pil_add_link` |
-| disc on a circular track, leaves it when N = 0 | `pil_add_circle_contact` (+ `_set_arc`) |
-| stop with a coefficient of restitution | `pil_add_stop` (lost energy in `pil_world_dissipated`) |
-| ramp or ledge that ends | `pil_floor_set_range` |
-
+| you want                                           | call                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------- |
+| spring / damper                                    | `pil_add_spring`, `pil_add_damper`                          |
+| torsional spring (+damper)                         | `pil_add_torsion_spring`                                    |
+| constant force / "pull"                            | `pil_add_force`                                             |
+| any force law you like                             | `pil_add_custom_force(fn)` - call `pil_apply_force` inside  |
+| pin / hinge                                        | `pil_add_revolute`                                          |
+| rigid rod / rope                                   | `pil_add_distance(..., 0)` / `(..., PIL_ROPE)`              |
+| rope over a pulley                                 | `pil_add_pulley_rope` (+ a static disc body for the pulley) |
+| sliding guide, rail                                | `pil_add_slot`, `pil_add_prismatic` (slot + fixed angle)    |
+| lock an angle / motor                              | `pil_add_fixed_angle`, `pil_add_rotation_drive`             |
+| roll without slipping on a line                    | `pil_add_rolling` (discs, cylinders, arc bands)             |
+| block/wedge/floor contact + friction               | `pil_add_floor_contact` (line may belong to a moving body)  |
+| uneven moving road                                 | `pil_add_terrain` + `pil_add_terrain_contact`               |
+| belt, gears, rack: two coordinates tied by a ratio | `pil_add_link`                                              |
+| disc on a circular track, leaves it when N = 0     | `pil_add_circle_contact` (+ `_set_arc`)                     |
+| stop with a coefficient of restitution             | `pil_add_stop` (lost energy in `pil_world_dissipated`)      |
+| ramp or ledge that ends                            | `pil_floor_set_range`                                       |
 
 - **Annotations** (visual only): `pil_add_dimension`, `_label`, `_arrow`, `_line`,
   `_angle_marker`, `_ground`, `_gravity_indicator`. For anything else register an overlay
@@ -185,8 +184,6 @@ The Euler-Lagrange equations are formed numerically and integrated along with th
 recording and reset work as usual. `T` may contain terms linear in the velocities (a rotating frame),
 which gives the Coriolis and gyroscopic terms; `pil_lsys_jacobi` returns the conserved Jacobi
 integral. Draw with an overlay and `pil_proj3_point`, an orthographic z-up projection.
-
-
 
 ## How it works
 

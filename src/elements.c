@@ -164,6 +164,35 @@ pil_element *pil_add_coulomb(pil_world *w, pil_body *a, double qa, pil_body *b,
                             2.0, 0.0);
 }
 
+pil_element *pil_add_drag(pil_world *w, pil_body *b, double lin, double quad) {
+  pil_element *e = new_el(w, EL_DRAG);
+  e->a = pil_on(b, 0, 0);
+  e->k = lin;
+  e->c = quad;
+  e->hidden = 1;
+
+  return e;
+}
+
+pil_element *pil_add_lorentz(pil_world *w, pil_body *b, double q, double ex,
+                             double ey, double bz) {
+  pil_element *e = new_el(w, EL_LORENTZ);
+  e->a = pil_on(b, 0, 0);
+  e->k = q;
+  e->f = pil_v2(ex, ey);
+  e->c = bz;
+  e->hidden = 1;
+
+  return e;
+}
+
+void pil_lorentz_set_fields(pil_element *e, double ex, double ey, double bz) {
+  if (e && e->kind == EL_LORENTZ) {
+    e->f = pil_v2(ex, ey);
+    e->c = bz;
+  }
+}
+
 pil_element *pil_add_custom_force(pil_world *w, pil_force_fn fn, void *user) {
   pil_element *e = new_el(w, EL_CUSTOM);
   e->fn = fn;
@@ -671,6 +700,24 @@ void pil_element_apply(pil_element *e, pil_world *w, double t) {
     e->last_force = mag * sqrt(r2);
     pil_apply_force(e->a.body, pa, v_mul(d, -mag));
     pil_apply_force(e->b.body, pb, v_mul(d, mag));
+
+    break;
+  }
+  case EL_DRAG: {
+    pil_body *b = e->a.body;
+    double sp = sqrt(v_dot(b->vel, b->vel));
+    double cf = e->k + e->c * sp;
+    pil_apply_force(b, b->pos, v_mul(b->vel, -cf));
+
+    break;
+  }
+  case EL_LORENTZ: {
+    pil_body *b = e->a.body;
+    // F = q (E + v x B zhat), v x zhat = (vy, -vx)
+    pil_apply_force(b, b->pos,
+                    pil_v2(e->k * (e->f.x + b->vel.y * e->c),
+                           e->k * (e->f.y - b->vel.x * e->c)));
+
     break;
   }
   case EL_TORSION: {
@@ -749,6 +796,11 @@ double pil_element_energy(const pil_element *e, double t) {
     }
 
     return -e->k / ((e->c - 1.0) * pow(s2, 0.5 * (e->c - 1.0)));
+  }
+  case EL_LORENTZ: {
+    pil_vec2 p = e->a.body->pos;
+
+    return -e->k * (e->f.x * p.x + e->f.y * p.y);
   }
   case EL_TORSION: {
     double ta = e->a.body ? e->a.body->angle : 0;

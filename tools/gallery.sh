@@ -32,6 +32,7 @@ shaker|6|Shaker with a driven block, rolling disc and pendulum
 projectile|5|Projectile with and without drag: traces and vectors
 cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
 kepler|7|Kepler orbit with equal-area wedges
+cyclotron|8|Charges in a magnetic field: circles and equal periods
 rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
 motor|5|DC motor driving a flywheel

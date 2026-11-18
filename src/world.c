@@ -815,6 +815,20 @@ pil_deco *pil_add_sweep(pil_world *w, pil_anchor center, pil_anchor point,
   return d;
 }
 
+pil_deco *pil_add_field_marks(pil_world *w, pil_vec2 lo, pil_vec2 hi,
+                              double spacing, pil_field_kind kind, double vx,
+                              double vy) {
+  pil_deco *d = new_deco(w, D_FIELD, "");
+  d->a = pil_at(lo.x, lo.y);
+  d->b = pil_at(hi.x, hi.y);
+  d->dt = spacing;
+  d->vkind = (int)kind;
+  d->dx = vx;
+  d->dy = vy;
+
+  return d;
+}
+
 pil_deco *pil_add_sweep_window(pil_world *w, pil_anchor center,
                                pil_anchor point, double t0, double t1,
                                double sample_dt) {
@@ -837,11 +851,14 @@ pil_deco *pil_add_sweep_window(pil_world *w, pil_anchor center,
 }
 
 int pil_trace_count(const pil_deco *trace) {
-  return trace && (trace->kind == D_TRACE || trace->kind == D_SWEEP) ? trace->npts : 0;
+  return trace && (trace->kind == D_TRACE || trace->kind == D_SWEEP)
+             ? trace->npts
+             : 0;
 }
 
 pil_vec2 pil_trace_point(const pil_deco *trace, int i) {
-  if (!trace || (trace->kind != D_TRACE && trace->kind != D_SWEEP) || i < 0 || i >= trace->npts) {
+  if (!trace || (trace->kind != D_TRACE && trace->kind != D_SWEEP) || i < 0 ||
+      i >= trace->npts) {
     return pil_v2(0, 0);
   }
 

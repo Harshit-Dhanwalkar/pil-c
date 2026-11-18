@@ -972,6 +972,55 @@ static void test_central_force(void) {
   pil_world_free(w);
 }
 
+static void test_lorentz_drag(void) {
+  puts("charge in fields, drag");
+  // q = m = B = 1, v = 1.5: circle of radius 1.5, period 2 pi, speed constant
+  pil_world *w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                                                 .mass = 1.0,
+                                                 .pos = {0, 0},
+                                                 .vel = {1.5, 0}});
+  pil_add_lorentz(w, b, 1.0, 0, 0, 1.0);
+  pil_world_advance(w, 3.14159265358979, 1e-3);
+  check("half turn: x back on axis", b->pos.x, 0.0, 2e-3);
+  check("half turn: y = -2 r", b->pos.y, -3.0, 2e-3);
+  check("speed constant", hypot(b->vel.x, b->vel.y), 1.5, 1e-4);
+  pil_world_free(w);
+
+  // crossed fields, released at rest: mean drift E/B, cycloid height 2 E
+  // m/(qB^2)
+  w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  b = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                                       .mass = 1.0,
+                                       .pos = {0, 0}});
+  pil_add_lorentz(w, b, 1.0, 0, 0.5, 1.0);
+  double E0 = pil_world_energy(w);
+  double ymax = 0;
+  for (int i = 0; i < 6283; i++) {
+    pil_world_advance(w, 1e-3, 1e-3);
+    if (b->pos.y > ymax) {
+      ymax = b->pos.y;
+    }
+  }
+  check("E x B drift over one turn", b->pos.x / 6.283185307, 0.5, 2e-3);
+  check("cycloid height", ymax, 1.0, 2e-3);
+  check("energy (kinetic + q E.x potential)", pil_world_energy(w), E0, 1e-4);
+  pil_world_free(w);
+
+  // quadratic drag from rest-speed 10: v' = -c v^2 gives v = v0 / (1 + c v0 t)
+  w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  b = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                                       .mass = 2.0,
+                                       .vel = {10.0, 0}});
+  pil_add_drag(w, b, 0.0, 0.4); // c = 0.2 per metre
+  pil_world_advance(w, 1.0, 1e-3);
+  check("quadratic drag speed", b->vel.x, 10.0 / (1.0 + 0.2 * 10.0), 1e-3);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -997,6 +1046,7 @@ int main(void) {
   test_rolling_on_plank();
   test_trace();
   test_central_force();
+  test_lorentz_drag();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
