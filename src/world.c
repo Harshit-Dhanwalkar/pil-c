@@ -757,8 +757,13 @@ static void trace_push(pil_deco *d, pil_vec2 p) {
 void pil_traces_record(pil_world *w) {
   for (int i = 0; i < w->ndecos; i++) {
     pil_deco *d = w->decos[i];
-    if (d->kind == D_TRACE && w->t >= d->next_t) {
-      trace_push(d, pil_anchor_world(d->a));
+    if (d->kind == D_SWEEP && d->offset > 0 &&
+        (w->t < d->ref - 1e-12 || w->t > d->offset + 1e-12)) {
+      continue; // fixed window: only record while inside it
+    }
+
+    if ((d->kind == D_TRACE || d->kind == D_SWEEP) && w->t >= d->next_t) {
+      trace_push(d, pil_anchor_world(d->kind == D_SWEEP ? d->b : d->a));
       d->next_t = w->t + d->dt;
     }
   }
@@ -767,7 +772,7 @@ void pil_traces_record(pil_world *w) {
 void pil_traces_clear(pil_world *w) {
   for (int i = 0; i < w->ndecos; i++) {
     pil_deco *d = w->decos[i];
-    if (d->kind == D_TRACE) {
+    if (d->kind == D_TRACE || d->kind == D_SWEEP) {
       d->npts = 0;
       d->next_t = 0;
       pil_traces_record(w);
@@ -792,12 +797,51 @@ pil_deco *pil_add_trace(pil_world *w, pil_anchor at, double sample_dt,
   return d;
 }
 
+pil_deco *pil_add_sweep(pil_world *w, pil_anchor center, pil_anchor point,
+                        double span, double sample_dt) {
+  pil_deco *d = new_deco(w, D_SWEEP, "");
+  d->a = center;
+  d->b = point;
+  d->dt = sample_dt;
+  d->maxpts = (int)(span / sample_dt) + 2;
+  d->pts = malloc((size_t)d->maxpts * sizeof *d->pts);
+  if (!d->pts) {
+    abort();
+  }
+
+  trace_push(d, pil_anchor_world(point));
+  d->next_t = w->t + sample_dt;
+
+  return d;
+}
+
+pil_deco *pil_add_sweep_window(pil_world *w, pil_anchor center,
+                               pil_anchor point, double t0, double t1,
+                               double sample_dt) {
+  pil_deco *d = new_deco(w, D_SWEEP, "");
+  d->a = center;
+  d->b = point;
+  d->dt = sample_dt;
+  d->ref = t0;
+  d->offset = t1; // window mode: both ends fixed, nothing is ever dropped
+  d->maxpts = (int)((t1 - t0) / sample_dt) + 4;
+  d->pts = malloc((size_t)d->maxpts * sizeof *d->pts);
+  if (!d->pts) {
+    abort();
+  }
+
+  d->next_t = t0;
+  pil_traces_record(w);
+
+  return d;
+}
+
 int pil_trace_count(const pil_deco *trace) {
-  return trace && trace->kind == D_TRACE ? trace->npts : 0;
+  return trace && (trace->kind == D_TRACE || trace->kind == D_SWEEP) ? trace->npts : 0;
 }
 
 pil_vec2 pil_trace_point(const pil_deco *trace, int i) {
-  if (!trace || trace->kind != D_TRACE || i < 0 || i >= trace->npts) {
+  if (!trace || (trace->kind != D_TRACE && trace->kind != D_SWEEP) || i < 0 || i >= trace->npts) {
     return pil_v2(0, 0);
   }
 

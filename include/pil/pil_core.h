@@ -214,6 +214,20 @@ pil_element *pil_add_torsion_spring(pil_world *w, pil_body *a, pil_body *b,
 pil_element *pil_add_force(pil_world *w, pil_anchor at,
                            pil_vec2 f); /* constant force */
 
+/* Central force between two anchors, attractive for k > 0: magnitude
+ * k r / (r^2 + eps^2)^((power + 1) / 2), so power 2 is inverse-square
+ * Acts on both bodies; potential energy is counted in pil_world_energy
+ * `eps` softens close encounters (0 = none) */
+pil_element *pil_add_pair_force(pil_world *w, pil_anchor a, pil_anchor b,
+                                double k, double power, double eps);
+/* Newtonian gravity between centres of two bodies (G m_a m_b / r^2) */
+pil_element *pil_add_gravity_pair(pil_world *w, pil_body *a, pil_body *b,
+                                  double big_g);
+/* Coulomb force between point charges on two bodies: like charges repel
+ * `k_e` is 1 / (4 pi eps0) in your units */
+pil_element *pil_add_coulomb(pil_world *w, pil_body *a, double qa, pil_body *b,
+                             double qb, double k_e);
+
 typedef void (*pil_force_fn)(pil_world *w, double t, void *user);
 /* Escape hatch: your callback may call pil_apply_force / pil_apply_torque. */
 pil_element *pil_add_custom_force(pil_world *w, pil_force_fn fn, void *user);
@@ -363,6 +377,16 @@ pil_deco *pil_add_line(pil_world *w, pil_anchor a, pil_anchor b, int dash_dot);
  * last `max_points`, cleared by pil_world_reset */
 pil_deco *pil_add_trace(pil_world *w, pil_anchor at, double sample_dt,
                         int max_points);
+/* Area swept by radius vector from `center` to a moving point over last `span`
+ * seconds, shaded (Kepler's second law) */
+pil_deco *pil_add_sweep(pil_world *w, pil_anchor center, pil_anchor point,
+                        double span, double sample_dt);
+/* Same for a fixed time window [t0, t1] of motion: shaded wedge stays where it
+ * was swept, so two windows of equal length at different phases show equal
+ * areas in equal times */
+pil_deco *pil_add_sweep_window(pil_world *w, pil_anchor center,
+                               pil_anchor point, double t0, double t1,
+                               double sample_dt);
 /* Read a trace back (export to a plot, compare with theory) */
 int pil_trace_count(const pil_deco *trace);
 pil_vec2 pil_trace_point(const pil_deco *trace, int i);

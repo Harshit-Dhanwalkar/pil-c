@@ -28,6 +28,10 @@ loop|5|Loop-the-loop
 tower|8|Rotating tower with a sliding block and a pendulum (Lagrangian)
 top|4|Heavy symmetric top: precession and nutation
 linkage|6|Parallelogram linkage with a rolling disc, slider and double pendulum
+shaker|6|Shaker with a driven block, rolling disc and pendulum
+projectile|5|Projectile with and without drag: traces and vectors
+cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
+kepler|7|Kepler orbit with equal-area wedges
 rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
 motor|5|DC motor driving a flywheel

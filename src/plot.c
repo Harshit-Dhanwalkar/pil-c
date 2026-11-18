@@ -11,9 +11,12 @@
  */
 
 #include "plot.h"
+#include "pil_internal.h"
+
 #include <cairo.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 pil_plot *pil_add_plot(pil_world *w, double x0, double y0, double x1, double y1,
@@ -159,6 +162,7 @@ void pil_plots_record(pil_world *w, double sample_dt, double max_dt) {
   pil_elements_rebase(w);
   pil_circuits_reset(w); // recording starts at t = 0
   pil_lsys_reset_all(w);
+  pil_traces_clear(w); // traces recorded during the pre-run are stale
 }
 
 // Drawing
@@ -312,14 +316,15 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
   cairo_restore(cr);
 
   // Cursor and markers at current time
-  if (p->n > 1 && w->t >= 0 && w->t <= p->span) {
+  if (p->n > 1 && w->t >= 0) {
+    double tcur = w->t - p->span * floor(w->t / p->span);
     cairo_set_dash(cr, NULL, 0, 0);
     cairo_set_line_width(cr, st->thin_w * 0.7);
-    cairo_move_to(cr, PX(w->t), by0);
-    cairo_line_to(cr, PX(w->t), by1);
+    cairo_move_to(cr, PX(tcur), by0);
+    cairo_line_to(cr, PX(tcur), by1);
     cairo_stroke(cr);
     for (int j = 0; j < p->nsig; j++) {
-      cairo_arc(cr, PX(w->t), PY(sample_at(p, j, w->t)), 3.0, 0, 2 * M_PI);
+      cairo_arc(cr, PX(tcur), PY(sample_at(p, j, tcur)), 3.0, 0, 2 * M_PI);
       cairo_fill(cr);
     }
   }

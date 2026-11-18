@@ -139,6 +139,31 @@ pil_element *pil_add_force(pil_world *w, pil_anchor at, pil_vec2 f) {
   return e;
 }
 
+pil_element *pil_add_pair_force(pil_world *w, pil_anchor a, pil_anchor b,
+                                double k, double power, double eps) {
+  pil_element *e = new_el(w, EL_PAIR);
+  e->a = a;
+  e->b = b;
+  e->k = k;
+  e->c = power;
+  e->rest = eps;
+  e->hidden = 1;
+
+  return e;
+}
+
+pil_element *pil_add_gravity_pair(pil_world *w, pil_body *a, pil_body *b,
+                                  double big_g) {
+  return pil_add_pair_force(w, pil_on(a, 0, 0), pil_on(b, 0, 0),
+                            big_g * a->mass * b->mass, 2.0, 0.0);
+}
+
+pil_element *pil_add_coulomb(pil_world *w, pil_body *a, double qa, pil_body *b,
+                             double qb, double k_e) {
+  return pil_add_pair_force(w, pil_on(a, 0, 0), pil_on(b, 0, 0), -k_e * qa * qb,
+                            2.0, 0.0);
+}
+
 pil_element *pil_add_custom_force(pil_world *w, pil_force_fn fn, void *user) {
   pil_element *e = new_el(w, EL_CUSTOM);
   e->fn = fn;
@@ -631,6 +656,23 @@ void pil_element_apply(pil_element *e, pil_world *w, double t) {
 
     break;
   }
+  case EL_PAIR: {
+    pil_vec2 pa = pil_anchor_world(e->a);
+    pil_vec2 pb = pil_anchor_world(e->b);
+    pil_vec2 d = v_sub(pa, pb);
+    double r2 = v_dot(d, d);
+    double den = pow(r2 + e->rest * e->rest, 0.5 * (e->c + 1.0));
+    if (den < 1e-300) {
+      break;
+    }
+
+    // attractive for k > 0: on a toward b, on b toward a
+    double mag = e->k / den;
+    e->last_force = mag * sqrt(r2);
+    pil_apply_force(e->a.body, pa, v_mul(d, -mag));
+    pil_apply_force(e->b.body, pb, v_mul(d, mag));
+    break;
+  }
   case EL_TORSION: {
     double ta = e->a.body ? e->a.body->angle : 0;
     double tb = e->b.body ? e->b.body->angle : 0;
@@ -697,6 +739,16 @@ double pil_element_energy(const pil_element *e, double t) {
     double x = sqrt(v_dot(d, d)) - e->rest;
 
     return 0.5 * e->k * x * x;
+  }
+  case EL_PAIR: {
+    pil_vec2 d = v_sub(pil_anchor_world(e->a), pil_anchor_world(e->b));
+    double s2 = v_dot(d, d) + e->rest * e->rest;
+
+    if (fabs(e->c - 1.0) < 1e-9) {
+      return 0.5 * e->k * log(s2);
+    }
+
+    return -e->k / ((e->c - 1.0) * pow(s2, 0.5 * (e->c - 1.0)));
   }
   case EL_TORSION: {
     double ta = e->a.body ? e->a.body->angle : 0;

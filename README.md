@@ -59,9 +59,9 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ## mechanics
 ./build/atwood  ./build/blocks    ./build/bowl       ./build/crank
 ./build/cycloid ./build/frame     ./build/impact     ./build/incline
-./build/linkage ./build/loop      ./build/projectile ./build/pulleys
-./build/ring    ./build/swing     ./build/tower      ./build/top
-./build/shaker
+./build/kepler  ./build/linkage   ./build/loop       ./build/projectile
+./build/pulleys ./build/ring      ./build/swing      ./build/tower
+./build/top     ./build/shaker
 ## Electrodynamics / circuits
 ./build/rlc     ./build/rectifier ./build/motor
 

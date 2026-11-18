@@ -841,6 +841,28 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     draw_vector(cr, d, v, st);
     break;
   }
+  case D_SWEEP: {
+    if (d->npts < 2) {
+      break;
+    }
+
+    cairo_save(cr);
+    pil_vec2 c = A;
+    cairo_move_to(cr, c.x, c.y);
+    for (int i = 0; i < d->npts; i++) {
+      pil_vec2 p = S(v, d->pts[i]);
+      cairo_line_to(cr, p.x, p.y);
+    }
+
+    cairo_close_path(cr);
+    cairo_set_source_rgb(cr, 0.85, 0.85, 0.85);
+    cairo_fill_preserve(cr);
+    ink(cr, st);
+    cairo_set_line_width(cr, st->thin_w);
+    cairo_stroke(cr);
+    cairo_restore(cr);
+    break;
+  }
   case D_LABEL: {
     pil_draw_text(cr, pil_v2(A.x + d->dx, A.y - d->dy), d->text,
                   align_for(d->dx), st);
@@ -1071,7 +1093,8 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   for (int i = 0; i < w->ndecos; i++) {
     if (w->decos[i]->kind == D_ENERGY_BAR) {
       draw_energy_bar(cr, w, w->decos[i], v, st);
-    } else if (w->decos[i]->kind == D_GROUND || w->decos[i]->kind == D_TRACE) {
+    } else if (w->decos[i]->kind == D_GROUND || w->decos[i]->kind == D_TRACE ||
+               w->decos[i]->kind == D_SWEEP) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }
@@ -1100,7 +1123,8 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   }
 
   for (int i = 0; i < w->ndecos; i++) {
-    if (w->decos[i]->kind != D_GROUND && w->decos[i]->kind != D_TRACE) {
+    if (w->decos[i]->kind != D_GROUND && w->decos[i]->kind != D_TRACE &&
+        w->decos[i]->kind != D_SWEEP) {
       draw_deco(cr, w->decos[i], v, st);
     }
   }

@@ -927,6 +927,51 @@ static void test_rolling_on_plank(void) {
   pil_world_free(w);
 }
 
+static void test_central_force(void) {
+  puts("central force: Kepler orbit");
+  // GM = 1, perihelion 0.4, e = 0.6: a = 1, period 2 pi, areal velocity 0.4
+  pil_world *w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  pil_body *s = pil_add_body(w, &(pil_body_desc){.shape = pil_disc(0.05),
+                                                 .mass = 1.0,
+                                                 .flags = PIL_STATIC});
+  pil_body *p = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                                                 .mass = 0.01,
+                                                 .pos = {0.4, 0},
+                                                 .vel = {0, 2.0}});
+  pil_add_gravity_pair(w, s, p, 1.0);
+  double E0 = pil_world_energy(w);
+  double rmax = 0, amax = 0, amin = 1e9;
+  for (int i = 0; i < 6283; i++) {
+    pil_world_advance(w, 1e-3, 1e-3);
+    rmax = fmax(rmax, hypot(p->pos.x, p->pos.y));
+    double rate = 0.5 * (p->pos.x * p->vel.y - p->pos.y * p->vel.x);
+    amax = fmax(amax, rate);
+    amin = fmin(amin, rate);
+  }
+  check("aphelion 2a - rp", rmax, 1.6, 2e-3);
+  check("areal velocity constant", amax - amin, 0.0, 1e-6);
+  check("energy conserved", (pil_world_energy(w) - E0) / fabs(E0), 0.0, 1e-6);
+  check("back at perihelion x", p->pos.x, 0.4, 2e-3);
+  pil_world_free(w);
+
+  puts("Coulomb: like charges repel");
+  w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  pil_body *a = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                                                 .mass = 1.0,
+                                                 .pos = {0, 0}});
+  pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                                                 .mass = 1.0,
+                                                 .pos = {1, 0}});
+  pil_add_coulomb(w, a, 1.0, b, 1.0, 2.0);
+  pil_world_advance(w, 0.1, 1e-3);
+  // F = k q q / r^2 = 2, a = 2, so after 0.1 s: dx = 0.5 * 2 * 0.01 = 0.01
+  check("repel: b moves away", b->pos.x - 1.0, 0.01, 2e-4);
+  check("repel: a moves back", a->pos.x, -0.01, 2e-4);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -951,6 +996,7 @@ int main(void) {
   test_top();
   test_rolling_on_plank();
   test_trace();
+  test_central_force();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
