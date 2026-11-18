@@ -232,9 +232,10 @@ pil_element *pil_add_coulomb(pil_world *w, pil_body *a, double qa, pil_body *b,
  * Dissipative, so it is not part of energy balance */
 pil_element *pil_add_drag(pil_world *w, pil_body *b, double lin, double quad);
 /* Charge q (C) in a uniform field: F = q (E + v x B), B along z (out of  page
- * for bz > 0) Magnetic part does no work, electric part adds potential -q E.x
- * to energy Fields may be set again later with pil_lorentz_set_fields (e.g. a
- * ramped or reversed field) */
+ * for bz > 0)
+ * Magnetic part does no work, electric part adds potential -q E.x to energy
+ * Fields may be set again later with pil_lorentz_set_fields (e.g. a ramped or
+ * reversed field) */
 pil_element *pil_add_lorentz(pil_world *w, pil_body *b, double q, double ex,
                              double ey, double bz);
 void pil_lorentz_set_fields(pil_element *e, double ex, double ey, double bz);

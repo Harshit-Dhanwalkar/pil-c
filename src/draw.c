@@ -502,6 +502,7 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
       }
     }
     cairo_close_path(cr);
+
     break;
   }
   case PIL_SHAPE_POLY: {
@@ -514,11 +515,13 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
       }
     }
     cairo_close_path(cr);
+
     break;
   }
   case PIL_SHAPE_DISC: {
     pil_vec2 c = S(v, c0);
     cairo_arc(cr, c.x, c.y, s->r * v->scale, 0, TWO_PI);
+
     break;
   }
   case PIL_SHAPE_POINT: {
@@ -528,6 +531,7 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
       r = 3.5;
     }
     cairo_arc(cr, c.x, c.y, r, 0, TWO_PI);
+
     break;
   }
   case PIL_SHAPE_ARC_BAND: {
@@ -550,6 +554,7 @@ static void body_path(cairo_t *cr, const pil_body *b, const pil_view *v) {
       cairo_line_to(cr, p.x, p.y);
     }
     cairo_close_path(cr);
+
     break;
   }
   }
@@ -626,6 +631,7 @@ static void draw_element(cairo_t *cr, const pil_element *e, const pil_view *v,
       pil_draw_dashpot(cr, a, b, e->length * v->scale, hw, st);
     }
     element_label(cr, e, pil_v2(0.5 * (a.x + b.x), 0.5 * (a.y + b.y)), st);
+
     break;
   }
   case EL_DISTANCE: {
@@ -653,6 +659,7 @@ static void draw_element(cairo_t *cr, const pil_element *e, const pil_view *v,
     }
     cairo_restore(cr);
     element_label(cr, e, pil_v2(0.5 * (a.x + b.x), 0.5 * (a.y + b.y)), st);
+
     break;
   }
   case EL_PULLEY: {
@@ -668,6 +675,7 @@ static void draw_element(cairo_t *cr, const pil_element *e, const pil_view *v,
     cairo_stroke(cr);
     cairo_restore(cr);
     element_label(cr, e, pil_v2(0.5 * (a.x + c1.x), 0.5 * (a.y + c1.y)), st);
+
     break;
   }
   default:
@@ -835,10 +843,12 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
 
     cairo_stroke(cr);
     cairo_restore(cr);
+
     break;
   }
   case D_VECTOR: {
     draw_vector(cr, d, v, st);
+
     break;
   }
   case D_FIELD: {
@@ -847,8 +857,10 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
       break;
     }
 
-    double x0 = fmin(A.x, B.x), x1 = fmax(A.x, B.x);
-    double y0 = fmin(A.y, B.y), y1 = fmax(A.y, B.y);
+    double x0 = fmin(A.x, B.x);
+    double x1 = fmax(A.x, B.x);
+    double y0 = fmin(A.y, B.y);
+    double y1 = fmax(A.y, B.y);
     cairo_save(cr);
     ink(cr, st);
     cairo_set_line_width(cr, st->thin_w);
@@ -895,6 +907,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     cairo_set_dash(cr, dash, 2, 0);
     cairo_stroke(cr);
     cairo_restore(cr);
+
     break;
   }
   case D_SWEEP: {
@@ -917,15 +930,18 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     cairo_set_line_width(cr, st->thin_w);
     cairo_stroke(cr);
     cairo_restore(cr);
+
     break;
   }
   case D_LABEL: {
     pil_draw_text(cr, pil_v2(A.x + d->dx, A.y - d->dy), d->text,
                   align_for(d->dx), st);
+
     break;
   }
   case D_GROUND: {
     pil_draw_hatch(cr, A, B, st);
+
     break;
   }
   case D_GRAVITY: {
@@ -945,10 +961,12 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
       cairo_line_to(cr, cx + k, cy - k);
       cairo_stroke(cr);
       cairo_restore(cr);
+
       break;
     }
     pil_draw_arrow(cr, A, pil_v2(A.x, A.y + 38), 10, st);
     pil_draw_text(cr, pil_v2(A.x + 9, A.y + 14), d->text, 0.0, st);
+
     break;
   }
   case D_LINE: {
@@ -963,6 +981,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     cairo_line_to(cr, B.x, B.y);
     cairo_stroke(cr);
     cairo_restore(cr);
+
     break;
   }
   case D_ARROW: {
@@ -978,6 +997,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
       pil_draw_text(cr, pil_v2(T.x + ux * 10, T.y + uy * 10), d->text,
                     ux < -0.3 ? 1.0 : (ux > 0.3 ? 0.0 : 0.5), st);
     }
+
     break;
   }
   case D_DIM: {
@@ -1022,6 +1042,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     if (tw > 0) {
       pil_draw_text(cr, pil_v2(mx, my), d->text, 0.5, st);
     }
+
     break;
   }
   case D_ANGLE_PTS: {
@@ -1051,6 +1072,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
                   pil_v2(A.x + (d->radius + 12) * cos(mid),
                          A.y + (d->radius + 12) * sin(mid)),
                   d->text, 0.5, st);
+
     break;
   }
   case D_ENERGY_BAR: {
@@ -1074,6 +1096,7 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     pil_draw_text(cr,
                   pil_v2(A.x + (r + 11) * cos(mid), A.y + (r + 11) * sin(mid)),
                   d->text, 0.5, st);
+
     break;
   }
   }
