@@ -61,7 +61,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/cycloid   ./build/frame    ./build/impact  ./build/incline
 ./build/kepler    ./build/linkage  ./build/loop    ./build/projectile
 ./build/pulleys   ./build/ring     ./build/swing   ./build/tower
-./build/top       ./build/shaker
+./build/top       ./build/shaker   ./build/collision
 ## Electrodynamics / circuits
 ./build/cyclotron  ./build/exb     ./build/rlc     ./build/rectifier
 ./build/motor
@@ -223,7 +223,7 @@ test in `tests/test_core.c`. `EL_PULLEY` is a compact worked example of each ste
 - [ ] Make controller `w/a/s/d` to control actuator
 - [ ] Spinning 3D bodies: the Lagrangian solver covers problems stated as energies; a rigid-body 3D renderer (quaternions) is still missing
 - [ ] Rolling is implemented on straight lines and circular tracks. Two curved bodies rolling on each other are not yet available.
-- [ ] No body–body collision. Contact exists between a body and a line (`pil_add_floor_contact`) or a circular track (`pil_add_circle_contact`).
+- [ ] Body–body contact is limited to frictionless disc–disc impacts (`pil_add_collision`); no polygon–polygon collision. Contact otherwise exists between a body and a line (`pil_add_floor_contact`) or a circular track (`pil_add_circle_contact`).
 - [ ] Contacts are penalty springs: use `max_dt ≲ 5·10⁻⁴` with stiff contacts (default in the examples).
 - [ ] The circuit solver assumes the wire graph is a forest when it assigns currents to wires; wire loops carry zero.
 - [ ] Mouse interaction in the window is covered by a unit test of the pick/grab physics and a

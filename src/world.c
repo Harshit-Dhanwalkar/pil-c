@@ -284,13 +284,17 @@ void pil_world_free(pil_world *w) {
   for (int i = 0; i < w->nels; i++) {
     free(w->els[i]);
   }
+
   for (int i = 0; i < w->ndecos; i++) {
     free(w->decos[i]->pts);
+    free(w->decos[i]->bodies);
     free(w->decos[i]);
   }
+
   for (int i = 0; i < w->nterr; i++) {
     free(w->terrains[i]);
   }
+
   pil_plots_free(w);
   pil_circuits_free(w);
   pil_lsys_free_all(w);
@@ -793,6 +797,31 @@ pil_deco *pil_add_trace(pil_world *w, pil_anchor at, double sample_dt,
 
   trace_push(d, pil_anchor_world(at));
   d->next_t = w->t + sample_dt;
+
+  return d;
+}
+
+pil_vec2 pil_bodies_com(pil_body *const *bodies, int n) {
+  double m = 0;
+  double x = 0;
+  double y = 0;
+  for (int i = 0; i < n; i++) {
+    m += bodies[i]->mass;
+    x += bodies[i]->mass * bodies[i]->pos.x;
+    y += bodies[i]->mass * bodies[i]->pos.y;
+  }
+
+  return m > 0 ? pil_v2(x / m, y / m) : pil_v2(0, 0);
+}
+
+pil_deco *pil_add_com_marker(pil_world *w, pil_body *const *bodies, int n,
+                             double p_px_per_unit, const char *label) {
+  pil_deco *d = new_deco(w, D_COM, label ? label : "CM");
+  d->bodies = malloc((size_t)n * sizeof *d->bodies);
+  memcpy(d->bodies, bodies, (size_t)n * sizeof *d->bodies);
+  d->nbodies = n;
+  d->dx = p_px_per_unit;
+  d->radius = 6.0;
 
   return d;
 }

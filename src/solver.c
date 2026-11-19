@@ -197,7 +197,11 @@ static void solve_lambda(pil_world *w, int m) {
 // zero extension rate, stop: -e times arrival rate) and leave every other
 // constraint's rate untouched, then apply them to body velocities
 static int stop_hit(const pil_element *e, pil_row *r) {
-  if (e->kind != EL_STOP || !pil_isdyn(e->a.body)) {
+  if (e->kind == EL_COLLIDE) {
+    if (!pil_isdyn(e->a.body) && !pil_isdyn(e->b.body)) {
+      return 0;
+    }
+  } else if (e->kind != EL_STOP || !pil_isdyn(e->a.body)) {
     return 0;
   }
 
@@ -240,7 +244,7 @@ void pil_project_rope_snaps(pil_world *w) {
   for (int i = 0; i < w->nels; i++) {
     pil_element *e = w->els[i];
     pil_row r[2];
-    if (e->kind == EL_STOP) {
+    if (e->kind == EL_STOP || e->kind == EL_COLLIDE) {
       if (!stop_hit(e, &r[0])) {
         continue;
       }

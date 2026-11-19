@@ -748,6 +748,11 @@ static pil_vec2 vector_value(const pil_deco *d) {
     return pil_v2(b->acc.x - b->alpha * r.y - b->omega * b->omega * r.x,
                   b->acc.y + b->alpha * r.x - b->omega * b->omega * r.y);
   }
+  case PIL_VEC_MOMENTUM: {
+    pil_vec2 u = pil_anchor_vel(d->a);
+
+    return b ? pil_v2(b->mass * u.x, b->mass * u.y) : pil_v2(0, 0);
+  }
   case PIL_VEC_FORCE: {
     return b ? pil_v2(b->mass * b->acc.x, b->mass * b->acc.y) : pil_v2(0, 0);
   }
@@ -848,6 +853,48 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
   }
   case D_VECTOR: {
     draw_vector(cr, d, v, st);
+
+    break;
+  }
+  case D_COM: {
+    pil_vec2 c = pil_bodies_com(d->bodies, d->nbodies);
+    pil_vec2 P = S(v, c);
+    double r = d->radius;
+    cairo_save(cr);
+    ink(cr, st);
+    cairo_set_line_width(cr, st->thin_w);
+    cairo_new_path(cr);
+    cairo_arc(cr, P.x, P.y, r, 0, TWO_PI);
+    cairo_stroke(cr);
+    // Opposite quarters filled
+    cairo_new_path(cr);
+    cairo_move_to(cr, P.x, P.y);
+    cairo_arc(cr, P.x, P.y, r, 0, 0.5 * M_PI);
+    cairo_close_path(cr);
+    cairo_fill(cr);
+    cairo_new_path(cr);
+    cairo_move_to(cr, P.x, P.y);
+    cairo_arc(cr, P.x, P.y, r, M_PI, 1.5 * M_PI);
+    cairo_close_path(cr);
+    cairo_fill(cr);
+    cairo_restore(cr);
+    if (d->dx > 0) {
+      double px = 0, py = 0;
+      for (int i = 0; i < d->nbodies; i++) {
+        px += d->bodies[i]->mass * d->bodies[i]->vel.x;
+        py += d->bodies[i]->mass * d->bodies[i]->vel.y;
+      }
+
+      px *= d->dx;
+      py *= d->dx;
+      if (sqrt(px * px + py * py) > 3.0) {
+        pil_draw_arrow(cr, P, pil_v2(P.x + px, P.y - py), 9, st);
+      }
+    }
+
+    if (d->text[0]) {
+      pil_draw_text(cr, pil_v2(P.x + r + 3, P.y - r - 3), d->text, 0.0, st);
+    }
 
     break;
   }

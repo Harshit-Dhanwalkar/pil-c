@@ -323,6 +323,16 @@ pil_element *pil_add_coord_drive(pil_world *w, pil_body *b, pil_coord coord,
  * e.g. a block bouncing between buffers */
 pil_element *pil_add_stop(pil_world *w, pil_body *b, pil_coord coord,
                           double limit, int upper, double restitution);
+/* Frictionless collision of two discs (or point masses) of radii ra, rb: when
+ * centres come within ra + rb while approaching, an impulse along line of
+ * centres gives them separation speed e times approach speed (e = 1 elastic,
+ * e = 0 stick-and-slide)
+ * Treated with same constraint-consistent impulse solve as stops, so bodies on
+ * rails or joints react correctly
+ * Rotation is not affected
+ * Radii are for collision only; draw shapes you want */
+pil_element *pil_add_collision(pil_world *w, pil_body *a, pil_body *b,
+                               double ra, double rb, double restitution);
 /* Rigidly join two bodies at a point (pin + fixed relative angle)
  * Returns pin */
 pil_element *pil_add_weld(pil_world *w, pil_anchor a, pil_anchor b);
@@ -409,6 +419,13 @@ typedef enum { PIL_FIELD_B = 0, PIL_FIELD_E } pil_field_kind;
 pil_deco *pil_add_field_marks(pil_world *w, pil_vec2 lo, pil_vec2 hi,
                               double spacing, pil_field_kind kind, double vx,
                               double vy);
+/* Centre-of-mass marker (quartered disc, label "CM") of given bodies, which are
+ * copied
+ * With p_px_per_unit > 0 an arrow for total momentum is drawn from it
+ * pil_bodies_com gives position for use in code */
+pil_deco *pil_add_com_marker(pil_world *w, pil_body *const *bodies, int n,
+                             double p_px_per_unit, const char *label);
+pil_vec2 pil_bodies_com(pil_body *const *bodies, int n);
 /* Read a trace back (export to a plot, compare with theory) */
 int pil_trace_count(const pil_deco *trace);
 pil_vec2 pil_trace_point(const pil_deco *trace, int i);
@@ -420,7 +437,8 @@ pil_vec2 pil_trace_point(const pil_deco *trace, int i);
 typedef enum {
   PIL_VEC_VELOCITY = 0,
   PIL_VEC_ACCELERATION,
-  PIL_VEC_FORCE
+  PIL_VEC_FORCE,
+  PIL_VEC_MOMENTUM
 } pil_vec_kind;
 enum { PIL_VEC_COMPONENTS = 1 };
 pil_deco *pil_add_vector(pil_world *w, pil_anchor at, pil_vec_kind kind,

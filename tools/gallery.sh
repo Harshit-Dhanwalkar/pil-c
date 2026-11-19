@@ -34,6 +34,7 @@ cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
 kepler|7|Kepler orbit with equal-area wedges
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
+collision|10|Two-disc collision in lab and CM frames, momentum arrows
 rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
 motor|5|DC motor driving a flywheel

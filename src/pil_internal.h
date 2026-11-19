@@ -31,6 +31,7 @@ typedef enum {
   EL_PULLEY,
   EL_FLOOR,
   EL_STOP,
+  EL_COLLIDE,
   EL_CIRCLE_CONTACT
 } pil_el_kind;
 
@@ -81,7 +82,8 @@ typedef enum {
   D_TRACE,
   D_VECTOR,
   D_SWEEP,
-  D_FIELD
+  D_FIELD,
+  D_COM
 } pil_deco_kind;
 struct pil_deco {
   pil_deco_kind kind;
@@ -100,11 +102,14 @@ struct pil_deco {
   char text[48];
   /* trace: sampled path; vector: kind and scale */
   pil_vec2 *pts;
-  int npts, maxpts;
+  int npts;
+  int maxpts;
   double next_t;
   double dt;
   int vkind;
   unsigned vflags;
+  pil_body **bodies; /* centre-of-mass marker */
+  int nbodies;
 };
 
 struct pil_terrain {
@@ -121,7 +126,11 @@ typedef struct {
 /* \phi = position error, vel = d(\phi)/dt, ja/jb = Jacobian rows,
  * \gamma = RHS of J*a = \gamma (already includes Baumgarte terms) */
 typedef struct {
-  double phi, vel, ja[3], jb[3], gamma;
+  double phi;
+  double vel;
+  double ja[3];
+  double jb[3];
+  double gamma;
 } pil_row;
 typedef struct {
   pil_element *el;
@@ -140,13 +149,20 @@ typedef struct {
 
 #define PIL_PLOT_MAX_SIGNALS 6
 struct pil_plot {
-  double x0, y0, x1, y1; /* canvas fractions, origin top-left          */
-  char xlabel[32], ylabel[32];
-  double span; /* time axis runs 0 .. span                              */
+  /* Canvas fractions, origin top-left */
+  double x0;
+  double y0;
+  double x1;
+  double y1;
+  char xlabel[32];
+  char ylabel[32];
+  /* Time axis runs 0 .. span */
+  double span;
   pil_signal sig[PIL_PLOT_MAX_SIGNALS];
   int nsig;
   double *t;
-  int n, cap;
+  int n;
+  int cap;
 };
 
 struct pil_world {
@@ -159,11 +175,14 @@ struct pil_world {
   pil_terrain **terrains;
   int nterr, tcap;
   pil_plot **plots;
-  int nplots, plcap;
+  int nplots;
+  int plcap;
   struct pil_circuit **circuits;
-  int ncircuits, ccap;
+  int ncircuits;
+  int ccap;
   struct pil_lsys **lsys;
-  int nlsys, lscap;
+  int nlsys;
+  int lscap;
   pil_overlay *overlays;
   int noverlays;
   int ocap;
@@ -179,15 +198,23 @@ struct pil_world {
   int have_snapshot;
   struct {
     pil_body *b;
-    pil_vec2 local, target;
-    double k, c;
+    pil_vec2 local;
+    pil_vec2 target;
+    double k;
+    double c;
   } grab;
   /* scratch */
-  double *K, *rhs;
+  double *K;
+  double *rhs;
   int kcap;
   pil_rowrec *rows;
   int rowcap;
-  double *s0, *k1, *k2, *k3, *k4, *tmp;
+  double *s0;
+  double *k1;
+  double *k2;
+  double *k3;
+  double *k4;
+  double *tmp;
   int scap;
 };
 
@@ -213,8 +240,8 @@ static inline pil_vec2 v_rot(pil_vec2 a, double th) {
   return pil_v2(c * a.x - s * a.y, s * a.x + c * a.y);
 }
 
-/* anchor helpers: offset r from body COM in world axes, world point,
- * velocity */
+/* Anchor helpers: offset r from body COM in world axes, world point, velocity
+ */
 pil_vec2 pil_anchor_r(pil_anchor a);
 pil_vec2 pil_anchor_vel(pil_anchor a);
 
@@ -223,19 +250,19 @@ void pil_traces_record(pil_world *w);
 void pil_traces_clear(pil_world *w);
 
 /* elements.c */
-/* Fills up to 2 rows; returns row count. A slack rope returns 0 unless
- * force_active */
+/* Fills up to 2 rows; returns row count
+ * A slack rope returns 0 unless force_active */
 int pil_constraint_eval(const pil_element *e, double t, pil_row rows[2],
                         int force_active);
 int pil_is_constraint(const pil_element *e);
 /* Unilateral stop: fills row (phi <= 0 allowed) and returns its restitution */
 double pil_stop_row(const pil_element *e, pil_row *r);
-int pil_is_rope(const pil_element *e); /* one-sided (pull-only) constraint */
-double pil_rope_length(const pil_element *e); /* current geometric length */
+int pil_is_rope(const pil_element *e); /* One-sided (pull-only) constraint */
+double pil_rope_length(const pil_element *e); /* Current geometric length */
 void pil_element_apply(pil_element *e, pil_world *w, double t);
 double pil_element_energy(const pil_element *e, double t);
 void pil_elements_rebase(
-    pil_world *w); /* re-derive phases after a state reset */
+    pil_world *w); /* Re-derive phases after a state reset */
 static inline int pil_isdyn(const pil_body *b) { return b && b->dof >= 0; }
 
 /* solver.c */
@@ -253,7 +280,7 @@ void pil_lsys_free_all(pil_world *w);
 
 /* plot.c */
 void pil_plots_free(pil_world *w);
-/* inelastic velocity impulse when a rope snaps taut while still extending
+/* Inelastic velocity impulse when a rope snaps taut while still extending
  * (called after each step) */
 void pil_project_rope_snaps(pil_world *w);
 

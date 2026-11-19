@@ -290,8 +290,42 @@ pil_element *pil_add_stop(pil_world *w, pil_body *b, pil_coord coord,
   return e;
 }
 
+pil_element *pil_add_collision(pil_world *w, pil_body *a, pil_body *b,
+                               double ra, double rb, double restitution) {
+  pil_element *e = new_el(w, EL_COLLIDE);
+  e->a.body = a;
+  e->b.body = b;
+  e->length = ra + rb;
+  e->k = restitution;
+  e->hidden = 1;
+
+  return e;
+}
+
 double pil_stop_row(const pil_element *e, pil_row *r) {
   memset(r, 0, sizeof *r);
+  if (e->kind == EL_COLLIDE) {
+    // phi >= 0 once discs touch; vel > 0 while they approach
+    pil_vec2 d = v_sub(e->b.body->pos, e->a.body->pos);
+    double dist = sqrt(v_dot(d, d));
+    if (dist < 1e-12) {
+      r->phi = -1.0;
+
+      return e->k;
+    }
+
+    pil_vec2 n = v_mul(d, 1.0 / dist);
+    pil_vec2 dv = v_sub(e->b.body->vel, e->a.body->vel);
+    r->phi = e->length - dist;
+    r->vel = -v_dot(n, dv);
+    r->ja[0] = n.x;
+    r->ja[1] = n.y;
+    r->jb[0] = -n.x;
+    r->jb[1] = -n.y;
+
+    return e->k;
+  }
+
   r->phi = e->sigma * (coord_q(e->a.body, e->ca) - e->phase);
   r->vel = e->sigma * coord_v(e->a.body, e->ca);
   r->ja[e->ca] = e->sigma;

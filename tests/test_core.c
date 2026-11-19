@@ -927,6 +927,52 @@ static void test_rolling_on_plank(void) {
   pil_world_free(w);
 }
 
+static void test_collision(void) {
+  puts("disc collision, CM");
+  pil_world *w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  pil_body *a = pil_add_body(w, &(pil_body_desc){.shape = pil_disc(0.3),
+                                                 .mass = 1.0,
+                                                 .pos = {-2, 0},
+                                                 .vel = {2, 0}});
+  pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_disc(0.45),
+                                                 .mass = 2.0,
+                                                 .pos = {0.5, 0.2}});
+  pil_add_collision(w, a, b, 0.3, 0.45, 0.8);
+  pil_body *both[2] = {a, b};
+  double T0 = pil_world_kinetic(w);
+  pil_world_advance(w, 3.0, 1e-3);
+  check("total px conserved", a->vel.x + 2.0 * b->vel.x, 2.0, 1e-9);
+  check("total py conserved", a->vel.y + 2.0 * b->vel.y, 0.0, 1e-9);
+  // Contact normal at impact: centres 0.75 apart, 0.2 offset across the path
+  double c = sqrt(1.0 - (0.2 / 0.75) * (0.2 / 0.75));
+  pil_vec2 n = {c, 0.2 / 0.75};
+  double vn = (b->vel.x - a->vel.x) * n.x + (b->vel.y - a->vel.y) * n.y;
+  // Approach speed along n is 2 cos(phi)
+  check("separation speed = e * approach", vn, 0.8 * 2.0 * c, 1e-3);
+  check("kinetic energy only decreases", pil_world_kinetic(w) < T0 ? 1.0 : 0.0,
+        1.0, 0);
+  pil_vec2 cm = pil_bodies_com(both, 2);
+  check("CM moves uniformly (x)", cm.x,
+        (-2.0 + 0.5 * 2.0) / 3.0 + 3.0 * 2.0 / 3.0, 1e-6);
+  pil_world_free(w);
+
+  // Equal masses, head on, e = 1: velocities are exchanged
+  w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  a = pil_add_body(w, &(pil_body_desc){.shape = pil_disc(0.2),
+                                       .mass = 1.0,
+                                       .pos = {-1, 0},
+                                       .vel = {1, 0}});
+  b = pil_add_body(
+      w, &(pil_body_desc){.shape = pil_disc(0.2), .mass = 1.0, .pos = {1, 0}});
+  pil_add_collision(w, a, b, 0.2, 0.2, 1.0);
+  pil_world_advance(w, 3.0, 1e-3);
+  check("elastic exchange: a at rest", a->vel.x, 0.0, 1e-9);
+  check("elastic exchange: b takes v", b->vel.x, 1.0, 1e-9);
+  pil_world_free(w);
+}
+
 static void test_central_force(void) {
   puts("central force: Kepler orbit");
   // GM = 1, perihelion 0.4, e = 0.6: a = 1, period 2 pi, areal velocity 0.4
@@ -1047,6 +1093,7 @@ int main(void) {
   test_trace();
   test_central_force();
   test_lorentz_drag();
+  test_collision();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
