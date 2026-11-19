@@ -71,6 +71,7 @@ struct pil_element {
 
 typedef enum {
   D_LABEL,
+  D_LIVE_LABEL,
   D_DIM,
   D_ARROW,
   D_LINE,
@@ -100,6 +101,8 @@ struct pil_deco {
   int reverse;
   pil_body *body;
   char text[48];
+  pil_live_label_fn lfn;
+  void *luser;
   /* trace: sampled path; vector: kind and scale */
   pil_vec2 *pts;
   int npts;

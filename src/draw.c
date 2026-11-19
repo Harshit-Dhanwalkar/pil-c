@@ -818,8 +818,8 @@ static void draw_vector(cairo_t *cr, const pil_deco *d, const pil_view *v,
 }
 
 // Annotations
-static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
-                      const pil_style *st) {
+static void draw_deco(cairo_t *cr, const pil_world *w, const pil_deco *d, 
+                      const pil_view *v, const pil_style *st) {
   if (d->hidden) {
     return;
   }
@@ -879,7 +879,8 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
     cairo_fill(cr);
     cairo_restore(cr);
     if (d->dx > 0) {
-      double px = 0, py = 0;
+      double px = 0;
+      double py = 0;
       for (int i = 0; i < d->nbodies; i++) {
         px += d->bodies[i]->mass * d->bodies[i]->vel.x;
         py += d->bodies[i]->mass * d->bodies[i]->vel.y;
@@ -983,6 +984,14 @@ static void draw_deco(cairo_t *cr, const pil_deco *d, const pil_view *v,
   case D_LABEL: {
     pil_draw_text(cr, pil_v2(A.x + d->dx, A.y - d->dy), d->text,
                   align_for(d->dx), st);
+
+    break;
+  }
+  case D_LIVE_LABEL: {
+    char buf[64];
+    d->lfn(w, d->luser, buf, sizeof buf);
+    pil_draw_text(cr, pil_v2(A.x + d->dx, A.y - d->dy), buf, align_for(d->dx),
+                  st);
 
     break;
   }
@@ -1221,7 +1230,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
       draw_energy_bar(cr, w, w->decos[i], v, st);
     } else if (w->decos[i]->kind == D_GROUND || w->decos[i]->kind == D_TRACE ||
                w->decos[i]->kind == D_SWEEP || w->decos[i]->kind == D_FIELD) {
-      draw_deco(cr, w->decos[i], v, st);
+      draw_deco(cr, w, w->decos[i], v, st);
     }
   }
   for (int i = 0; i < w->ncircuits; i++) {
@@ -1251,7 +1260,7 @@ void pil_draw_world(cairo_t *cr, const pil_world *w, const pil_view *v,
   for (int i = 0; i < w->ndecos; i++) {
     if (w->decos[i]->kind != D_GROUND && w->decos[i]->kind != D_TRACE &&
         w->decos[i]->kind != D_SWEEP && w->decos[i]->kind != D_FIELD) {
-      draw_deco(cr, w->decos[i], v, st);
+      draw_deco(cr, w, w->decos[i], v, st);
     }
   }
   for (int i = 0; i < w->nbodies; i++) {

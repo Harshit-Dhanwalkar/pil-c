@@ -388,6 +388,11 @@ pil_element *pil_add_terrain_contact(pil_world *w, pil_terrain *t,
 /* Text supports  x_1  x_{12}  x^2  and UTF-8 (e.g. "\xcf\x86" for \phi) */
 pil_deco *pil_add_label(pil_world *w, pil_anchor at, const char *text,
                         double dx_px, double dy_px);
+/* Live text label: callback updates string every frame */
+typedef void (*pil_live_label_fn)(const pil_world *w, void *user, char *buf,
+                                  int n);
+pil_deco *pil_add_live_label(pil_world *w, pil_anchor at, pil_live_label_fn fn,
+                             void *user, double dx_px, double dy_px);
 pil_deco *pil_add_dimension(pil_world *w, pil_anchor a, pil_anchor b,
                             double offset_px, const char *text);
 /* Arrow starting at `from`, pointing (dx,dy) pixels (dy up) */

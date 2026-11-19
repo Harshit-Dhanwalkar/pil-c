@@ -706,6 +706,18 @@ pil_deco *pil_add_label(pil_world *w, pil_anchor at, const char *text,
   return d;
 }
 
+pil_deco *pil_add_live_label(pil_world *w, pil_anchor at, pil_live_label_fn fn,
+                             void *user, double dx, double dy) {
+  pil_deco *d = new_deco(w, D_LIVE_LABEL, "");
+  d->a = at;
+  d->lfn = fn;
+  d->luser = user;
+  d->dx = dx;
+  d->dy = dy;
+
+  return d;
+}
+
 pil_deco *pil_add_dimension(pil_world *w, pil_anchor a, pil_anchor b,
                             double offset, const char *text) {
   pil_deco *d = new_deco(w, D_DIM, text);

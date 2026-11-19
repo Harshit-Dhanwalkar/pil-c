@@ -14,6 +14,18 @@
 #include "example_main.h"
 #include <math.h>
 
+// Callback for live label
+static void theta_label_fn(const pil_world *w, void *user, char *buf, int n) {
+  (void)w;
+  pil_body **b = (pil_body **)user;
+  double dx = b[1]->pos.x - b[0]->pos.x;
+  double dy = b[1]->pos.y - b[0]->pos.y;
+  double theta = atan2(dy, dx) * 180.0 / M_PI;
+  if (theta < 0)
+    theta += 360.0;
+  snprintf(buf, n, "\xce\xb8 = %.0f\xc2\xb0", theta);
+}
+
 static pil_body *disc(pil_world *w, double r, double m, pil_vec2 p, pil_vec2 v,
                       double fill) {
   return pil_add_body(w, &(pil_body_desc){.shape = pil_disc(r),
@@ -24,7 +36,7 @@ static pil_body *disc(pil_world *w, double r, double m, pil_vec2 p, pil_vec2 v,
                                           .flags = PIL_HIDE_COM});
 }
 
-// Invisible walls for discs to bounce back into view instead of leaving the
+// Invisible walls for discs to bounce back into view instead of leaving
 // viewport
 static void add_walls(pil_world *w, pil_body *b) {
   // upper=0 means q >= limit, upper=1 means q <= limit
@@ -40,19 +52,36 @@ static void row(pil_world *w, double y, double vcm, double e) {
   const double m1 = 1.0;
   const double m2 = 2.0;
   const double u = 2.0;
-  pil_body *b[2];
-  b[0] = disc(w, r1, m1, (pil_vec2){-3.0, y}, (pil_vec2){u - vcm, 0}, 0.9);
-  b[1] = disc(w, r2, m2, (pil_vec2){0.5, y + 0.2}, (pil_vec2){-vcm, 0}, 0.6);
-  pil_add_collision(w, b[0], b[1], r1, r2, e);
+  static pil_body *b[2][2];
+  static int row_idx = 0;
+
+  b[row_idx][0] =
+      disc(w, r1, m1, (pil_vec2){-3.0, y}, (pil_vec2){u - vcm, 0}, 0.9);
+  b[row_idx][1] =
+      disc(w, r2, m2, (pil_vec2){0.5, y + 0.2}, (pil_vec2){-vcm, 0}, 0.6);
+
+  pil_add_collision(w, b[row_idx][0], b[row_idx][1], r1, r2, e);
+
+  // Dashed-line connecting centers
+  pil_add_line(w, pil_on(b[row_idx][0], 0, 0), pil_on(b[row_idx][1], 0, 0), 1);
+
+  // Angle of collision (theta) at center of first disc
+  // It is measured from horizontal axis to line of centers
+  pil_add_angle_between(w, pil_on(b[row_idx][0], 0, 0),
+                        pil_on(b[row_idx][0], 1, 0),
+                        pil_on(b[row_idx][1], 0, 0), 25, "\xce\xb8");
 
   for (int i = 0; i < 2; i++) {
-    add_walls(w, b[i]); // Keep them on screen
-    pil_add_trace(w, pil_on(b[i], 0, 0), 0.02, 2000);
-    pil_add_vector(w, pil_on(b[i], 0, 0), PIL_VEC_MOMENTUM, 35.0, 0,
+    add_walls(w, b[row_idx][i]); // Keep them on screen
+    pil_add_trace(w, pil_on(b[row_idx][i], 0, 0), 0.02, 2000);
+    pil_add_vector(w, pil_on(b[row_idx][i], 0, 0), PIL_VEC_MOMENTUM, 35.0, 0,
                    i ? "p_2" : "p_1");
   }
 
-  pil_add_com_marker(w, b, 2, 35.0, "CM");
+  pil_add_live_label(w, pil_at(-3.4, y + 0.9), theta_label_fn, b[row_idx], 0,
+                     0);
+
+  row_idx++;
 }
 
 int main(int argc, char **argv) {
@@ -63,7 +92,8 @@ int main(int argc, char **argv) {
 
   row(w, 1.9, 0.0, e);
   row(w, -1.9, vcm, e);
-  pil_add_label(w, pil_at(-3.4, 3.4), "lab frame", 2, 0);
+
+  pil_add_label(w, pil_at(-3.4, 3.4), "Lab frame", 2, 0);
   pil_add_label(w, pil_at(-3.4, 0.0), "CM frame (P = 0)", 2, 0);
   pil_add_label(w, pil_at(3.2, 3.4), "e = 0.8, m_2 = 2 m_1", 0, 0);
 
