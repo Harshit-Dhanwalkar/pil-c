@@ -36,9 +36,10 @@ cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 collision|10|Two-disc collision in lab and CM frames, momentum arrows
 modes|11|Coupled oscillators: normal modes and energy beats
+motor|5|DC motor driving a flywheel
+faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking
 rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
-motor|5|DC motor driving a flywheel
 '
 
 CARDS=
