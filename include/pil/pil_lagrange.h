@@ -60,6 +60,26 @@ void pil_lsys_mass_matrix(const pil_lsys *s, double *M);
  * still conserved in a steadily rotating frame */
 double pil_lsys_jacobi(const pil_lsys *s);
 
+/* Free rigid body (no torque) with principal moments I[0..2] about body axes
+ * 1, 2, 3, in Euler angles q = (phi, theta, psi), z-x-z: R = Rz(phi) Rx(theta)
+ * Rz(psi), whose columns are body axes in space. Pass pil_rigid3_T as T  (and
+ * no V) with a pil_rigid3 as `user`
+ * Z axis of space is where angular momentum is put by pil_rigid3_state, so
+ * theta is angle from L to axis 3 and stays clear of its 0 / pi singularity
+ * unless body spins exactly about axis 3 (or about -3) */
+typedef struct {
+  double I[3];
+} pil_rigid3;
+double pil_rigid3_T(const double *q, const double *qd, void *user);
+/* R[row][col]: column i = body axis e_i in space */
+void pil_rigid3_axes(const double *q, double R[3][3]);
+/* Angular velocity, body-frame components */
+void pil_rigid3_omega(const double *q, const double *qd, double w_body[3]);
+/* Angles q and rates qd for angular velocity w_body (body frame) when angular
+ * momentum I w is along space z; phi0 (rotation about L) is free */
+void pil_rigid3_state(const pil_rigid3 *p, const double w_body[3], double phi0,
+                      double *q, double *qd);
+
 /* Orthographic view of a z-up 3D scene: projected point is in same world units
  * as rest of figure, so annotations can use it. yaw turns scene about z, pitch
  * tilts it towards viewer */

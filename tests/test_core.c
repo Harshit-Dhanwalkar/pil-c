@@ -1104,6 +1104,73 @@ static void test_modes(void) {
   }
 }
 
+static void test_rigid3(void) {
+  puts("torque-free asymmetric body");
+  pil_rigid3 p = {{1.0, 1.36, 1.64}};
+  pil_world *w = pil_world_new();
+  pil_lsys *s = pil_add_lagrangian(w, 3, pil_rigid3_T, NULL, &p);
+  double w0[3] = {0.2, 3.0, 0.15};
+  double q0[3], qd0[3];
+  pil_rigid3_state(&p, w0, 0.0, q0, qd0);
+  pil_lsys_set_state(s, q0, qd0);
+  double Lm = sqrt(pow(p.I[0] * w0[0], 2) + pow(p.I[1] * w0[1], 2) +
+                   pow(p.I[2] * w0[2], 2));
+  double E0 = pil_lsys_jacobi(s);
+  double dE = 0;
+  double dL = 0;
+  double dLz = 0;
+  double dOrth = 0;
+  double minw2 = 1e9;
+  double maxw2 = -1e9;
+  const double *q = pil_lsys_q(s);
+  const double *qd = pil_lsys_qd(s);
+  for (int i = 0; i < 20000; i++) {
+    pil_world_step(w, 1e-3);
+    double wb[3];
+    pil_rigid3_omega(q, qd, wb);
+    double Lb[3] = {p.I[0] * wb[0], p.I[1] * wb[1], p.I[2] * wb[2]};
+    dE = fmax(dE, fabs(pil_lsys_jacobi(s) - E0));
+    dL = fmax(dL,
+              fabs(sqrt(Lb[0] * Lb[0] + Lb[1] * Lb[1] + Lb[2] * Lb[2]) - Lm));
+    // L in space = R L_body must stay along z with length Lm
+    double R[3][3];
+    pil_rigid3_axes(q, R);
+    double Lx = 0, Ly = 0, Lz = 0;
+    for (int k = 0; k < 3; k++) {
+      Lx += R[0][k] * Lb[k];
+      Ly += R[1][k] * Lb[k];
+      Lz += R[2][k] * Lb[k];
+    }
+
+    dLz = fmax(dLz, fmax(fabs(Lx), fmax(fabs(Ly), fabs(Lz - Lm))));
+    double d = 0;
+    for (int a = 0; a < 3; a++) {
+      for (int b = 0; b < 3; b++) {
+        double dot = 0;
+        for (int k = 0; k < 3; k++) {
+          dot += R[k][a] * R[k][b];
+        }
+
+        d = fmax(d, fabs(dot - (a == b)));
+      }
+    }
+
+    dOrth = fmax(dOrth, d);
+    minw2 = fmin(minw2, wb[1]);
+    maxw2 = fmax(maxw2, wb[1]);
+  }
+
+  check("energy conserved", dE, 0.0, 1e-5);
+  check("|L| conserved", dL, 0.0, 1e-5);
+  check("L stays fixed along space z", dLz, 0.0, 1e-5);
+  check("axes stay orthonormal", dOrth, 0.0, 1e-12);
+  // Spinning about intermediate axis 2 is unstable: omega_2 changes sign
+  check("intermediate axis flips (w2 < 0 reached)", minw2 < 0 ? 1.0 : 0.0, 1.0,
+        0);
+  check("and returns (w2 > 2.5)", maxw2 > 2.5 ? 1.0 : 0.0, 1.0, 0);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1126,6 +1193,7 @@ int main(void) {
   test_circle_contact();
   test_lagrangian();
   test_top();
+  test_rigid3();
   test_rolling_on_plank();
   test_trace();
   test_central_force();
