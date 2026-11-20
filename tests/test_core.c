@@ -1034,7 +1034,7 @@ static void test_lorentz_drag(void) {
   check("speed constant", hypot(b->vel.x, b->vel.y), 1.5, 1e-4);
   pil_world_free(w);
 
-  // crossed fields, released at rest: mean drift E/B, cycloid height 2 E
+  // Crossed fields, released at rest: mean drift E/B, cycloid height 2 E
   // m/(qB^2)
   w = pil_world_new();
   pil_world_set_gravity(w, 0, 0);
@@ -1055,7 +1055,7 @@ static void test_lorentz_drag(void) {
   check("energy (kinetic + q E.x potential)", pil_world_energy(w), E0, 1e-4);
   pil_world_free(w);
 
-  // quadratic drag from rest-speed 10: v' = -c v^2 gives v = v0 / (1 + c v0 t)
+  // Quadratic drag from rest-speed 10: v' = -c v^2 gives v = v0 / (1 + c v0 t)
   w = pil_world_new();
   pil_world_set_gravity(w, 0, 0);
   b = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.03),
@@ -1065,6 +1065,43 @@ static void test_lorentz_drag(void) {
   pil_world_advance(w, 1.0, 1e-3);
   check("quadratic drag speed", b->vel.x, 10.0 / (1.0 + 0.2 * 10.0), 1e-3);
   pil_world_free(w);
+}
+
+static void test_modes(void) {
+  puts("normal modes");
+  // k = 4, kc = 2, m = 1: omega1 = 2, omega2 = sqrt(8)
+  // each mode returns after one of its own periods
+  const double m = 1.0;
+  const double k = 4.0;
+  const double kc = 2.0;
+  const double L = 1.2;
+  double om[2] = {sqrt(k / m), sqrt((k + 2 * kc) / m)};
+  double sgn[2] = {1.0, -1.0};
+  for (int mode = 0; mode < 2; mode++) {
+    pil_world *w = pil_world_new();
+    pil_world_set_gravity(w, 0, 0);
+    pil_body *b[2];
+    for (int i = 0; i < 2; i++) {
+      double x = (i + 1) * L + (i ? sgn[mode] : 1.0) * 0.1;
+      b[i] = pil_add_body(w, &(pil_body_desc){.shape = pil_point_mass(0.05),
+                                              .mass = m,
+                                              .pos = {x, 0}});
+      pil_add_prismatic(w, pil_on(b[i], 0, 0), pil_at((i + 1) * L, 0),
+                        (pil_vec2){1, 0});
+    }
+    pil_add_spring(w, pil_at(0, 0), pil_on(b[0], 0, 0), k, L);
+    pil_add_spring(w, pil_on(b[0], 0, 0), pil_on(b[1], 0, 0), kc, L);
+    pil_add_spring(w, pil_on(b[1], 0, 0), pil_at(3 * L, 0), k, L);
+    double T = 2 * 3.14159265358979 / om[mode];
+    pil_world_advance(w, T, 1e-4);
+    check(mode ? "mode 2 returns after its period"
+               : "mode 1 returns after its period",
+          b[0]->pos.x, L + 0.1, 1e-4);
+    pil_world_advance(w, 0.5 * T, 1e-4);
+    check("and is at the opposite extreme after half more", b[0]->pos.x,
+          L - 0.1, 1e-4);
+    pil_world_free(w);
+  }
 }
 
 int main(void) {
@@ -1094,6 +1131,7 @@ int main(void) {
   test_central_force();
   test_lorentz_drag();
   test_collision();
+  test_modes();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
