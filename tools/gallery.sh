@@ -36,6 +36,7 @@ collision|10|Two-disc collision in lab and CM frames, momentum arrows
 modes|11|Coupled oscillators: normal modes and energy beats
 freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
 motor|5|DC motor driving a flywheel
+phase|14|Damped pendulum with a phase-portrait plot
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking

@@ -493,6 +493,13 @@ pil_plot *pil_add_plot(pil_world *w, double x0, double y0, double x1, double y1,
                        const char *xlabel, const char *ylabel, double t_span);
 void pil_plot_add_signal(pil_plot *p, const char *label, pil_signal_fn fn,
                          void *user);
+/* Phase-portrait mode: draw every other signal against signal `xsig` (index in
+ * order added) instead of against time; animation then moves a dot along each
+ * curve
+ * For phase portraits, Lissajous figures, orbits */
+void pil_plot_set_xy(pil_plot *p, int xsig);
+/* Run world from its current state for t_span (sampling every `sample_dt`,
+ * integrating with steps <= max_dt), fill every plot, then restore state */
 /* Run world from its current state for t_span (sampling every `sample_dt`,
  * integrating with steps <= max_dt), fill every plot, then restore state */
 void pil_plots_record(pil_world *w, double sample_dt, double max_dt);

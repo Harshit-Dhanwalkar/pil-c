@@ -7,8 +7,7 @@
  *
  * A plot owns a time axis and up to PIL_PLOT_MAX_SIGNALS curves
  * Curves are computed up front by pil_plots_record() (run world, sample,
- * restore) so panel shows whole result and a cursor follows live animation
- */
+ * restore) so panel shows whole result and a cursor follows live animation */
 
 #include "plot.h"
 #include "pil_internal.h"
@@ -207,6 +206,11 @@ static double sample_at(const pil_plot *p, int j, double t) {
   return p->sig[j].v[k] * (1 - f) + p->sig[j].v[k + 1] * f;
 }
 
+void pil_plot_set_xy(pil_plot *p, int xsig) {
+  p->xy = 1;
+  p->xs = xsig;
+}
+
 void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
                    const pil_view *v, const pil_style *st) {
   const double ml = 66;
@@ -224,6 +228,10 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
   double hi = 1;
   int have = 0;
   for (int j = 0; j < p->nsig && p->n > 0; j++) {
+    if (p->xy && j == p->xs) {
+      continue;
+    }
+
     for (int k = 0; k < p->n; k++) {
       double y = p->sig[j].v[k];
       if (!have) {
@@ -242,17 +250,37 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
 
   // Headroom for legend, then snap to tick marks (a value within 3% of a tick
   // sits on it instead of forcing a whole extra step)
-  double legend_frac = (p->nsig * 16 + 10) / (by1 - by0);
+  double legend_frac = ((p->nsig - (p->xy ? 1 : 0)) * 16 + 10) / (by1 - by0);
   hi += (hi - lo) * legend_frac / (1.0 - legend_frac);
   double ystep = nice_step(hi - lo, 4), snap = 0.03 * (hi - lo);
   lo = floor((lo + snap) / ystep) * ystep;
   hi = ceil((hi - snap) / ystep) * ystep;
-  double xstep = nice_step(p->span, 5);
+  // x range: time 0..span, or the data of the x signal in xy mode
+  double xlo = 0;
+  double xhi = p->span;
+  if (p->xy && p->n > 0) {
+    xlo = xhi = p->sig[p->xs].v[0];
+    for (int k = 0; k < p->n; k++) {
+      xlo = fmin(xlo, p->sig[p->xs].v[k]);
+      xhi = fmax(xhi, p->sig[p->xs].v[k]);
+    }
 
-#define PX(t) (bx0 + (t) / p->span * (bx1 - bx0))
+    if (xhi - xlo < 1e-12) {
+      xhi = xlo + 1.0;
+    }
+
+    double xs0 = nice_step(xhi - xlo, 5);
+    double snap_x = 0.03 * (xhi - xlo);
+    xlo = floor((xlo + snap_x) / xs0) * xs0;
+    xhi = ceil((xhi - snap_x) / xs0) * xs0;
+  }
+
+  double xstep = nice_step(xhi - xlo, 5);
+
+#define PX(t) (bx0 + ((t) - xlo) / (xhi - xlo) * (bx1 - bx0))
 #define PY(y) (by1 - ((y) - lo) / (hi - lo) * (by1 - by0))
 
-  pil_style up = *st; /* digits stand upright, symbols stay italic */
+  pil_style up = *st; /* Digits stand upright, symbols stay italic */
   up.upright = 1;
   cairo_save(cr);
   ink(cr, st);
@@ -261,7 +289,8 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
   cairo_stroke(cr);
 
   char buf[32];
-  for (double t = 0; t <= p->span + 1e-9; t += xstep) {
+  for (double t = ceil(xlo / xstep - 1e-9) * xstep; t <= xhi + 1e-9 * xstep;
+       t += xstep) {
     cairo_move_to(cr, PX(t), by1);
     cairo_line_to(cr, PX(t), by1 - 4);
     cairo_stroke(cr);
@@ -294,7 +323,11 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
   cairo_rectangle(cr, bx0, by0, bx1 - bx0, by1 - by0);
   cairo_clip(cr);
   for (int j = 0; j < p->nsig && p->n > 1; j++) {
-    int style = j % 5;
+    if (p->xy && j == p->xs) {
+      continue;
+    }
+
+    int style = (p->xy && j > p->xs ? j - 1 : j) % 5;
     cairo_set_line_width(cr, st->thin_w * 1.15);
     if (style == 0) {
       cairo_set_dash(cr, NULL, 0, 0);
@@ -303,10 +336,11 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
     }
 
     for (int k = 0; k < p->n; k++) {
+      double xv = p->xy ? p->sig[p->xs].v[k] : p->t[k];
       if (k == 0) {
-        cairo_move_to(cr, PX(p->t[k]), PY(p->sig[j].v[k]));
+        cairo_move_to(cr, PX(xv), PY(p->sig[j].v[k]));
       } else {
-        cairo_line_to(cr, PX(p->t[k]), PY(p->sig[j].v[k]));
+        cairo_line_to(cr, PX(xv), PY(p->sig[j].v[k]));
       }
     }
 
@@ -320,11 +354,19 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
     double tcur = w->t - p->span * floor(w->t / p->span);
     cairo_set_dash(cr, NULL, 0, 0);
     cairo_set_line_width(cr, st->thin_w * 0.7);
-    cairo_move_to(cr, PX(tcur), by0);
-    cairo_line_to(cr, PX(tcur), by1);
-    cairo_stroke(cr);
+    if (!p->xy) {
+      cairo_move_to(cr, PX(tcur), by0);
+      cairo_line_to(cr, PX(tcur), by1);
+      cairo_stroke(cr);
+    }
+
     for (int j = 0; j < p->nsig; j++) {
-      cairo_arc(cr, PX(tcur), PY(sample_at(p, j, tcur)), 3.0, 0, 2 * M_PI);
+      if (p->xy && j == p->xs) {
+        continue;
+      }
+
+      double xv = p->xy ? sample_at(p, p->xs, tcur) : tcur;
+      cairo_arc(cr, PX(xv), PY(sample_at(p, j, tcur)), 3.0, 0, 2 * M_PI);
       cairo_fill(cr);
     }
   }
@@ -332,11 +374,11 @@ void pil_plot_draw(cairo_t *cr, const pil_plot *p, const pil_world *w,
   // Legend, top right inside box
   double ly = by0 + 14;
   for (int j = 0; j < p->nsig; j++) {
-    if (!p->sig[j].label[0]) {
+    if (!p->sig[j].label[0] || (p->xy && j == p->xs)) {
       continue;
     }
 
-    int style = j % 5;
+    int style = (p->xy && j > p->xs ? j - 1 : j) % 5;
     cairo_set_line_width(cr, st->thin_w * 1.15);
     if (style == 0) {
       cairo_set_dash(cr, NULL, 0, 0);

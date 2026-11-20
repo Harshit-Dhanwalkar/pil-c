@@ -166,6 +166,9 @@ struct pil_plot {
   double *t;
   int n;
   int cap;
+  /* xy mode: curves against signal xs, not time */
+  int xy;
+  int xs;
 };
 
 struct pil_world {
