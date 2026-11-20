@@ -842,6 +842,74 @@ static void test_top(void) {
   pil_world_free(w);
 }
 
+static void test_rigid3(void) {
+  puts("torque-free asymmetric body");
+  pil_rigid3 p = {{1.0, 1.36, 1.64}};
+  pil_world *w = pil_world_new();
+  pil_lsys *s = pil_add_lagrangian(w, 3, pil_rigid3_T, NULL, &p);
+  double w0[3] = {0.2, 3.0, 0.15};
+  double q0[3], qd0[3];
+  pil_rigid3_state(&p, w0, 0.0, q0, qd0);
+  pil_lsys_set_state(s, q0, qd0);
+  double Lm = sqrt(pow(p.I[0] * w0[0], 2) + pow(p.I[1] * w0[1], 2) +
+                   pow(p.I[2] * w0[2], 2));
+  double E0 = pil_lsys_jacobi(s);
+  double dE = 0;
+  double dL = 0;
+  double dLz = 0;
+  double dOrth = 0;
+  double minw2 = 1e9;
+  double maxw2 = -1e9;
+  const double *q = pil_lsys_q(s);
+  const double *qd = pil_lsys_qd(s);
+  for (int i = 0; i < 20000; i++) {
+    pil_world_step(w, 1e-3);
+    double wb[3];
+    pil_rigid3_omega(q, qd, wb);
+    double Lb[3] = {p.I[0] * wb[0], p.I[1] * wb[1], p.I[2] * wb[2]};
+    dE = fmax(dE, fabs(pil_lsys_jacobi(s) - E0));
+    dL = fmax(dL,
+              fabs(sqrt(Lb[0] * Lb[0] + Lb[1] * Lb[1] + Lb[2] * Lb[2]) - Lm));
+    // L in space = R L_body must stay along z with length Lm
+    double R[3][3];
+    pil_rigid3_axes(q, R);
+    double Lx = 0, Ly = 0, Lz = 0;
+    for (int k = 0; k < 3; k++) {
+      Lx += R[0][k] * Lb[k];
+      Ly += R[1][k] * Lb[k];
+      Lz += R[2][k] * Lb[k];
+    }
+
+    dLz = fmax(dLz, fmax(fabs(Lx), fmax(fabs(Ly), fabs(Lz - Lm))));
+    double d = 0;
+    for (int a = 0; a < 3; a++) {
+      for (int b = 0; b < 3; b++) {
+        double dot = 0;
+        for (int k = 0; k < 3; k++) {
+          dot += R[k][a] * R[k][b];
+        }
+
+        d = fmax(d, fabs(dot - (a == b)));
+      }
+    }
+
+    dOrth = fmax(dOrth, d);
+    minw2 = fmin(minw2, wb[1]);
+    maxw2 = fmax(maxw2, wb[1]);
+  }
+
+  check("energy conserved", dE, 0.0, 1e-5);
+  check("|L| conserved", dL, 0.0, 1e-5);
+  check("L stays fixed along space z", dLz, 0.0, 1e-5);
+  check("axes stay orthonormal", dOrth, 0.0, 1e-12);
+  // Spinning about intermediate axis 2 is unstable: omega_2 changes sign
+  check("intermediate axis flips (w2 < 0 reached)", minw2 < 0 ? 1.0 : 0.0, 1.0,
+        0);
+  check("and returns (w2 > 2.5)", maxw2 > 2.5 ? 1.0 : 0.0, 1.0, 0);
+  pil_world_free(w);
+}
+
+
 static void test_trace(void) {
   puts("traces");
   pil_world *w = pil_world_new();
@@ -1104,71 +1172,50 @@ static void test_modes(void) {
   }
 }
 
-static void test_rigid3(void) {
-  puts("torque-free asymmetric body");
-  pil_rigid3 p = {{1.0, 1.36, 1.64}};
-  pil_world *w = pil_world_new();
-  pil_lsys *s = pil_add_lagrangian(w, 3, pil_rigid3_T, NULL, &p);
-  double w0[3] = {0.2, 3.0, 0.15};
-  double q0[3], qd0[3];
-  pil_rigid3_state(&p, w0, 0.0, q0, qd0);
-  pil_lsys_set_state(s, q0, qd0);
-  double Lm = sqrt(pow(p.I[0] * w0[0], 2) + pow(p.I[1] * w0[1], 2) +
-                   pow(p.I[2] * w0[2], 2));
-  double E0 = pil_lsys_jacobi(s);
-  double dE = 0;
-  double dL = 0;
-  double dLz = 0;
-  double dOrth = 0;
-  double minw2 = 1e9;
-  double maxw2 = -1e9;
-  const double *q = pil_lsys_q(s);
-  const double *qd = pil_lsys_qd(s);
-  for (int i = 0; i < 20000; i++) {
-    pil_world_step(w, 1e-3);
-    double wb[3];
-    pil_rigid3_omega(q, qd, wb);
-    double Lb[3] = {p.I[0] * wb[0], p.I[1] * wb[1], p.I[2] * wb[2]};
-    dE = fmax(dE, fabs(pil_lsys_jacobi(s) - E0));
-    dL = fmax(dL,
-              fabs(sqrt(Lb[0] * Lb[0] + Lb[1] * Lb[1] + Lb[2] * Lb[2]) - Lm));
-    // L in space = R L_body must stay along z with length Lm
-    double R[3][3];
-    pil_rigid3_axes(q, R);
-    double Lx = 0, Ly = 0, Lz = 0;
-    for (int k = 0; k < 3; k++) {
-      Lx += R[0][k] * Lb[k];
-      Ly += R[1][k] * Lb[k];
-      Lz += R[2][k] * Lb[k];
+static void test_bead_chain(void) {
+  puts("bead chain standing waves");
+  // N = 9 beads, zero-rest springs: mode n has omega = 2 sqrt(k/m) sin(n pi /
+  // 2(N+1))
+  const int N = 9;
+  const double k = 100.0;
+  const double m = 1.0;
+  const double dx = 0.5;
+  for (int mode = 1; mode <= 3; mode++) {
+    pil_world *w = pil_world_new();
+    pil_world_set_gravity(w, 0, 0);
+    pil_body *b[9];
+    for (int j = 0; j < N; j++) {
+      double x = (j + 1) * dx;
+      b[j] = pil_add_body(
+          w, &(pil_body_desc){.shape = pil_point_mass(0.03),
+                              .mass = m,
+                              .pos = {x, 0.1 * sin(mode * 3.14159265358979 *
+                                                   (j + 1) / (N + 1))}});
+      pil_add_prismatic(w, pil_on(b[j], 0, 0), pil_at(x, 0), (pil_vec2){0, 1});
     }
 
-    dLz = fmax(dLz, fmax(fabs(Lx), fmax(fabs(Ly), fabs(Lz - Lm))));
-    double d = 0;
-    for (int a = 0; a < 3; a++) {
-      for (int b = 0; b < 3; b++) {
-        double dot = 0;
-        for (int k = 0; k < 3; k++) {
-          dot += R[k][a] * R[k][b];
-        }
-
-        d = fmax(d, fabs(dot - (a == b)));
-      }
+    pil_add_spring(w, pil_at(0, 0), pil_on(b[0], 0, 0), k, 0.0);
+    for (int j = 0; j + 1 < N; j++) {
+      pil_add_spring(w, pil_on(b[j], 0, 0), pil_on(b[j + 1], 0, 0), k, 0.0);
     }
 
-    dOrth = fmax(dOrth, d);
-    minw2 = fmin(minw2, wb[1]);
-    maxw2 = fmax(maxw2, wb[1]);
+    pil_add_spring(w, pil_on(b[N - 1], 0, 0), pil_at((N + 1) * dx, 0), k, 0.0);
+    double om =
+        2.0 * sqrt(k / m) * sin(mode * 3.14159265358979 / (2.0 * (N + 1)));
+    double T = 2.0 * 3.14159265358979 / om;
+    pil_world_advance(w, T, 1e-4);
+    double err = 0;
+    for (int j = 0; j < N; j++) {
+      err = fmax(err, fabs(b[j]->pos.y - 0.1 * sin(mode * 3.14159265358979 *
+                                                   (j + 1) / (N + 1))));
+    }
+
+    check(mode == 1   ? "mode 1 returns after 2 pi / omega_1"
+          : mode == 2 ? "mode 2 returns after 2 pi / omega_2"
+                      : "mode 3 returns after 2 pi / omega_3",
+          err, 0.0, 2e-4);
+    pil_world_free(w);
   }
-
-  check("energy conserved", dE, 0.0, 1e-5);
-  check("|L| conserved", dL, 0.0, 1e-5);
-  check("L stays fixed along space z", dLz, 0.0, 1e-5);
-  check("axes stay orthonormal", dOrth, 0.0, 1e-12);
-  // Spinning about intermediate axis 2 is unstable: omega_2 changes sign
-  check("intermediate axis flips (w2 < 0 reached)", minw2 < 0 ? 1.0 : 0.0, 1.0,
-        0);
-  check("and returns (w2 > 2.5)", maxw2 > 2.5 ? 1.0 : 0.0, 1.0, 0);
-  pil_world_free(w);
 }
 
 int main(void) {
@@ -1200,6 +1247,7 @@ int main(void) {
   test_lorentz_drag();
   test_collision();
   test_modes();
+  test_bead_chain();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

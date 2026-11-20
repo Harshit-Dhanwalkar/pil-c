@@ -62,7 +62,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/impact    ./build/incline ./build/kepler ./build/linkage
 ./build/loop      ./build/modes   ./build/phase  ./build/projectile
 ./build/pulleys   ./build/ring    ./build/swing  ./build/tower
-./build/top       ./build/shaker
+./build/top       ./build/shaker  ./build/waves
 ## Electrodynamics / circuits
 ./build/cyclotron ./build/exb     ./build/faraday ./build/motor
 ./build/rlc       ./build/rectifier
