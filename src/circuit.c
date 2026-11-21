@@ -697,11 +697,6 @@ static int step_once(pil_circuit *c, double h) {
           AT(e->branch, e->mate->branch) -= Mq;
           rhs[e->branch] -= Mq * e->mate->i;
         }
-        if (e->mate) {
-          double Mq = e->mutual / (th * h);
-          AT(e->branch, e->mate->branch) -= Mq;
-          rhs[e->branch] -= Mq * e->mate->i;
-        }
         continue;
       }
       case CE_MOTOR:
