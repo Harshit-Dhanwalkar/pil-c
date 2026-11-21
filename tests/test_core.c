@@ -16,7 +16,7 @@ static void check(const char *name, double got, double want, double tol) {
   }
 }
 
-// 1. mass on a spring: period 2*pi*sqrt(m/k), energy conserved
+// 1. Mass on a spring: period 2*pi*sqrt(m/k), energy conserved
 static void test_spring(void) {
   puts("spring-mass");
   pil_world *w = pil_world_new();
@@ -34,14 +34,14 @@ static void test_spring(void) {
   pil_world_free(w);
 }
 
-// 2. rigid rod pendulum: small-angle period of a physical pendulum, energy
+// 2. Rigid rod pendulum: small-angle period of a physical pendulum, energy
 static void test_pendulum(void) {
   puts("physical pendulum (revolute)");
   pil_world *w = pil_world_new();
   double L = 1.0;
   double m = 3.0;
   double th0 = 0.05;
-  // uniform bar hinged at its end; COM at L/2
+  // Uniform bar hinged at its end; COM at L/2
   pil_body *bar = pil_add_body(
       w, &(pil_body_desc){.shape = pil_rect(L, 0.05),
                           .mass = m,
@@ -59,7 +59,7 @@ static void test_pendulum(void) {
   pil_world_free(w);
 }
 
-// 3. cylinder rolling down an incline: a = g \sin(a) / 1.5
+// 3. Cylinder rolling down an incline: a = g \sin(a) / 1.5
 static void test_rolling(void) {
   puts("cylinder rolling on incline (rolling constraint)");
   pil_world *w = pil_world_new();
@@ -83,7 +83,7 @@ static void test_rolling(void) {
   pil_world_free(w);
 }
 
-// 4. rope: taut -> acts like a rod; goes slack when pushed together
+// 4. Rope: taut -> acts like a rod; goes slack when pushed together
 static void test_rope(void) {
   puts("rope");
   pil_world *w = pil_world_new();
@@ -132,7 +132,7 @@ static void test_slot(void) {
   pil_world_free(w);
 }
 
-// 6. block resting on a floor (penalty contact): settles with N = m g
+// 6. Block resting on a floor (penalty contact): settles with N = m g
 static void test_floor(void) {
   puts("block on floor (contact + friction)");
   pil_world *w = pil_world_new();
@@ -142,13 +142,13 @@ static void test_floor(void) {
                                                  .vel = {1.0, 0}});
   pil_add_floor_contact(w, b, pil_at(0, 0), (pil_vec2){1, 0}, 2e5, 2e3, 0.3);
   pil_world_advance(w, 0.2, 1e-4);
-  // sliding friction decelerates at \mu g = 2.943 m/s^2
+  // Sliding friction decelerates at \mu g = 2.943 m/s^2
   check("sliding deceleration", 1.0 - b->vel.x, 0.3 * 9.81 * 0.2, 2e-3);
   check("rest height (small penetration)", b->pos.y, 0.1, 2e-3);
   pil_world_free(w);
 }
 
-// 7. double pendulum chain: constraint drift + energy over 10 s
+// 7. Double pendulum chain: constraint drift + energy over 10 s
 static void test_chain(void) {
   puts("double pendulum (chaotic regime, 10 s)");
   pil_world *w = pil_world_new();
@@ -171,7 +171,7 @@ static void test_chain(void) {
 // 8. Atwood machine:
 // a = g (m1-m2)/(m1+m2)
 // T = 2 m1 m2 g /(m1+m2)
-// rope goes slack if both are lifted
+// Rope goes slack if both are lifted
 static void test_atwood(void) {
   puts("Atwood machine (pulley rope)");
   pil_world *w = pil_world_new();
@@ -199,7 +199,7 @@ static void test_atwood(void) {
   check("constraint error", pil_world_constraint_error(w), 0.0, 1e-8);
   pil_world_free(w);
 
-  // equal masses at rest: tension = m g, nothing moves
+  // Equal masses at rest: tension = m g, nothing moves
   w = pil_world_new();
   A = pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.2, 0.2),
                                        .mass = 2.0,
@@ -218,7 +218,7 @@ static void test_atwood(void) {
   pil_world_free(w);
 }
 
-// 9. mouse grab: pick a body, drag its target; grabbed point follows
+// 9. Mouse grab: pick a body, drag its target; grabbed point follows
 static void test_grab(void) {
   puts("mouse grab (pick + soft spring)");
   pil_world *w = pil_world_new();
@@ -232,7 +232,7 @@ static void test_grab(void) {
   check("pick misses empty space",
         pil_world_pick(w, (pil_vec2){0.5, 0.5}, NULL) == NULL, 1.0, 0);
 
-  // grab at COM: pure translation, critically damped -> COM lands on target
+  // Grab at COM: pure translation, critically damped -> COM lands on target
   pil_world_set_grab(w, b, (pil_vec2){0, 0}, (pil_vec2){1.0, 0.5},
                      300.0 * b->mass, 2.0 * sqrt(300.0) * b->mass);
   pil_world_advance(w, 3.0, 1e-3);
@@ -241,7 +241,7 @@ static void test_grab(void) {
   check("COM grab: no rotation", b->angle, 0.0, 1e-9);
   pil_world_clear_grab(w);
 
-  // off-centre grab: the body rotates, but the grabbed point reaches the target
+  // Off-centre grab: body rotates, but grabbed point reaches target
   pil_vec2 loc = {0.15, 0.05};
   pil_vec2 target = {2.0, 1.0};
   pil_world_set_grab(w, b, loc, target, 300.0 * b->mass,
@@ -276,8 +276,8 @@ static void test_ball_in_bowl(void) {
   check("returns after one analytic period (x)", ball->pos.x, p0.x, 2e-5);
   check("energy drift / |E|", (pil_world_energy(w) - E0) / fabs(E0), 0.0, 1e-7);
   check("constraint error", pil_world_constraint_error(w), 0.0, 1e-6);
-  // no slip: contact-point velocity along track is zero => \omega = -(D
-  // psidot)/r
+  // No slip: contact-point velocity along track is zero =>
+  // \omega = -(D psidot)/r
   pil_world_advance(w, 0.3, 1e-3);
   pil_vec2 d = {ball->pos.x - c.x, ball->pos.y - c.y};
   double psid =
@@ -286,7 +286,7 @@ static void test_ball_in_bowl(void) {
   pil_world_free(w);
 }
 
-// 11. ball in a MOVING bowl: horizontal momentum and energy are conserved
+// 11. Ball in a MOVING bowl: horizontal momentum and energy are conserved
 static void test_ball_in_moving_bowl(void) {
   puts("ball in a movable bowl (both bodies dynamic)");
   pil_world *w = pil_world_new();
@@ -305,7 +305,7 @@ static void test_ball_in_moving_bowl(void) {
                           .mass = mr,
                           .pos = {c.x + D * cos(psi0), c.y + D * sin(psi0)}});
   pil_add_prismatic(w, pil_on(bowl, 0, 0), pil_at(0, c.y),
-                    (pil_vec2){1, 0}); /* bowl slides horizontally */
+                    (pil_vec2){1, 0}); // bowl slides horizontally
   pil_add_fixed_angle(w, bowl, NULL, 0.0);
   pil_add_circle_rolling(w, pil_on(ball, 0, 0), r, pil_on(bowl, 0, 0), R, 1);
   double E0 = pil_world_energy(w);
@@ -317,7 +317,7 @@ static void test_ball_in_moving_bowl(void) {
   pil_world_free(w);
 }
 
-// 12. ball over top of a cylinder (convex contact)
+// 12. Ball over top of a cylinder (convex contact)
 static void test_ball_over_cylinder(void) {
   puts("ball on top of a cylinder (convex contact)");
   pil_world *w = pil_world_new();
@@ -338,7 +338,7 @@ static void test_ball_over_cylinder(void) {
   pil_world_free(w);
 }
 
-// 13. weld: compound pendulum (bar + welded end mass), T from I_total/(m g d)
+// 13. Weld: compound pendulum (bar + welded end mass), T from I_total/(m g d)
 static void test_weld(void) {
   puts("weld (compound pendulum)");
   pil_world *w = pil_world_new();
@@ -371,7 +371,7 @@ static void test_weld(void) {
   pil_world_free(w);
 }
 
-// 14. rope snapping taut at speed: no visible stretch and snap is nelastic
+// 14. Rope snapping taut at speed: no visible stretch and snap is nelastic
 // (energy never rises)
 static void test_rope_snap(void) {
   puts("rope snapping taut at ~5 m/s");
@@ -525,7 +525,7 @@ static void test_circuits(void) {
     check("RC low-pass gain at the corner", peak, 1 / sqrt(2.0), 2e-3);
     pil_world_free(w);
   }
-  // half-wave rectifier: peak output = V_pk - V_d with V_d from diode law
+  // Half-wave rectifier: peak output = V_pk - V_d with V_d from diode law
   {
     pil_world *w = pil_world_new();
     pil_circuit *c = pil_add_circuit(w);
@@ -560,7 +560,7 @@ static void test_circuits(void) {
     check("diode Newton stays cheap (< 30 iterations)", worst < 30, 1, 0);
     pil_world_free(w);
   }
-  // switch closes at 1 ms, then RC charges
+  // Switch closes at 1 ms, then RC charges
   {
     pil_world *w = pil_world_new();
     pil_circuit *c = pil_add_circuit(w);
@@ -585,7 +585,7 @@ static void test_circuits(void) {
 
 static void test_electromechanics(void) {
   puts("electromechanical coupling (DC motor, voice coil)");
-  // motor spinning a flywheel against viscous drag:
+  // Motor spinning a flywheel against viscous drag:
   // \omega(t) = \omega_{ss} (1 - \exp(-t/\tau)),
   // \omega_{ss} = Kt V / (R c + Kt^2),
   // \tau = J R / (R c + Kt^2)
@@ -612,7 +612,7 @@ static void test_electromechanics(void) {
           wss * (1 - exp(-0.2 / tau)), 0.01 * wss);
     pil_world_free(w);
   }
-  // voice coil holding a spring-mounted mass: x_ss = K V / (R k)
+  // Voice coil holding a spring-mounted mass: x_ss = K V / (R k)
   {
     pil_world *w = pil_world_new();
     pil_world_set_gravity(w, 0, 0);
@@ -638,7 +638,7 @@ static void test_electromechanics(void) {
 
 static void test_stops(void) {
   puts("impact stops");
-  // free mass hits a wall at x = 1 with restitution e:
+  // Free mass hits a wall at x = 1 with restitution e:
   // speed -> -e v and lost kinetic energy is (1 - e^2) m v^2 / 2
   double es[] = {1.0, 0.6, 0.0};
   for (int i = 0; i < 3; i++) {
@@ -663,8 +663,8 @@ static void test_stops(void) {
 static void test_circle_contact(void) {
   puts("circle contact (loop-the-loop)");
   double g = 9.81, Rl = 1.0, r = 0.05, D = Rl - r, m = 1.0;
-  // frictionless disc sliding inside a loop leaves wall where \cos(\phi) = (2 g
-  // D - v0^2) / (3 g D), \phi measured from bottom
+  // Frictionless disc sliding inside a loop leaves wall where
+  // \cos(\phi) = (2 g D - v0^2) / (3 g D), \phi measured from bottom
   {
     pil_world *w = pil_world_new();
     pil_body *b =
@@ -684,7 +684,7 @@ static void test_circle_contact(void) {
     check("detachment angle", got, want, 0.12);
     pil_world_free(w);
   }
-  // rolling without slipping (high mu): bottom speed^2 = 4/3 g h for a solid
+  // Rolling without slipping (high mu): bottom speed^2 = 4/3 g h for a solid
   // disc released from rest at height h above bottom of track
   {
     pil_world *w = pil_world_new();
@@ -715,7 +715,11 @@ typedef struct {
 // angle gamma, swinging across arm)
 static double tower_T(const double *q, const double *qd, void *u) {
   const tower_params *p = u;
-  double x = q[0], xd = qd[0], gd = qd[1], sg = sin(q[1]), cg = cos(q[1]);
+  double x = q[0];
+  double xd = qd[0];
+  double gd = qd[1];
+  double sg = sin(q[1]);
+  double cg = cos(q[1]);
   double t1 = 0.5 * p->m1 * (xd * xd + p->Om * p->Om * x * x);
   double vx = xd - p->Om * p->l * sg, vy = p->l * cg * gd + p->Om * x,
          vz = p->l * sg * gd;
@@ -746,14 +750,17 @@ static void test_lagrangian(void) {
     pil_world *w = pil_world_new();
     pil_lsys *s = pil_add_lagrangian(w, 1, pend_T, pend_V, NULL);
     pil_lsys_set_state(s, (double[]){0.05}, (double[]){0});
-    double T0 = 2 * M_PI / sqrt(9.81), hmax = 0, th_prev = 0.05, tcross = -1;
+    double T0 = 2 * M_PI / sqrt(9.81);
+    double hmax = 0;
+    double th_prev = 0.05;
+    double tcross = -1;
     double h0 = pil_lsys_jacobi(s);
     for (int i = 0; i < 4000; i++) {
       pil_world_step(w, 1e-3);
       hmax = fmax(hmax, fabs(pil_lsys_jacobi(s) - h0));
       double th = pil_lsys_q(s)[0];
       if (tcross < 0 && th_prev > 0 && th <= 0 && i > 10) {
-        tcross = (i + 1) * 1e-3 + 0; // first zero crossing = T/4
+        tcross = (i + 1) * 1e-3 + 0; // First zero crossing = T/4
       }
       th_prev = th;
     }
@@ -761,7 +768,7 @@ static void test_lagrangian(void) {
     check("pendulum quarter period", tcross, T0 / 4, 2e-3);
     pil_world_free(w);
   }
-  // rotating arm: block sits at x = k L0 / (k - m Om^2) with no pendulum motion
+  // Rotating arm: block sits at x = k L0 / (k - m Om^2) with no pendulum motion
   // (centrifugal term); stays put for ever
   {
     tower_params p = {1.0, 0.0001, 0.5, 60.0, 0.8, 3.0, 9.81};
@@ -799,7 +806,11 @@ static void test_lagrangian(void) {
 }
 
 typedef struct {
-  double I1, I3, m, l, g;
+  double I1;
+  double I3;
+  double m;
+  double l;
+  double g;
 } top_params;
 
 static double top_T(const double *q, const double *qd, void *u) {
@@ -827,7 +838,10 @@ static void test_top(void) {
   const double *qd = pil_lsys_qd(s);
   double ppsi0 = p.I3 * (qd[2] + qd[0] * cos(q[1]));
   double pphi0 = p.I1 * qd[0] * sin(q[1]) * sin(q[1]) + ppsi0 * cos(q[1]);
-  double h0 = pil_lsys_jacobi(s), dpsi = 0, dphi = 0, dh = 0;
+  double h0 = pil_lsys_jacobi(s);
+  double dpsi = 0;
+  double dphi = 0;
+  double dh = 0;
   for (int i = 0; i < 4000; i++) {
     pil_world_step(w, 1e-3);
     double ppsi = p.I3 * (qd[2] + qd[0] * cos(q[1]));
@@ -873,7 +887,9 @@ static void test_rigid3(void) {
     // L in space = R L_body must stay along z with length Lm
     double R[3][3];
     pil_rigid3_axes(q, R);
-    double Lx = 0, Ly = 0, Lz = 0;
+    double Lx = 0;
+    double Ly = 0;
+    double Lz = 0;
     for (int k = 0; k < 3; k++) {
       Lx += R[0][k] * Lb[k];
       Ly += R[1][k] * Lb[k];
@@ -1054,7 +1070,9 @@ static void test_central_force(void) {
                                                  .vel = {0, 2.0}});
   pil_add_gravity_pair(w, s, p, 1.0);
   double E0 = pil_world_energy(w);
-  double rmax = 0, amax = 0, amin = 1e9;
+  double rmax = 0;
+  double amax = 0;
+  double amin = 1e9;
   for (int i = 0; i < 6283; i++) {
     pil_world_advance(w, 1e-3, 1e-3);
     rmax = fmax(rmax, hypot(p->pos.x, p->pos.y));
@@ -1243,6 +1261,16 @@ static void test_roll_race(void) {
   }
 }
 
+static void res_push(pil_world *w, double t, void *user) {
+  (void)w;
+  struct {
+    pil_body *b;
+    double F0;
+    double w;
+  } *d = user;
+  pil_apply_force(d->b, d->b->pos, pil_v2(d->F0 * cos(d->w * t), 0));
+}
+
 static void test_bridge_rectifier(void) {
   puts("bridge rectifier: v_load stays positive, ripple small, ~ peak - 2 "
        "diode drops");
@@ -1259,14 +1287,17 @@ static void test_bridge_rectifier(void) {
   pil_celement *r = pil_resistor(c, p, n, 500.0, "R");
   pil_capacitor(c, p, n, 20e-6, 0.0, "C");
   pil_world_advance(w, 10e-3, 1e-4);
-  double lo = 1e9; double hi = -1e9;
+  double lo = 1e9;
+  double hi = -1e9;
   for (int i = 0; i < 100; i++) {
     pil_world_advance(w, 5e-5, 1e-4);
     double v = pil_celement_voltage(r);
     if (v < lo) {
-      lo = v;}
+      lo = v;
+    }
     if (v > hi) {
-      hi = v;}
+      hi = v;
+    }
   }
   check("no negative load voltage", lo > 0.0, 1, 0);
   check("ripple under 1.5 V", hi - lo < 1.5, 1, 0);
@@ -1280,18 +1311,24 @@ static void test_resonance(void) {
   const double m = 1.0, k = 100.0, c = 2.0, F0 = 1.0, w0 = sqrt(k / m);
   pil_world *w = pil_world_new();
   pil_world_set_gravity(w, 0, 0);
-  pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.5, 0.4),
-                                                 .mass = m, .pos = {0, 0}});
+  pil_body *b = pil_add_body(
+      w,
+      &(pil_body_desc){.shape = pil_rect(0.5, 0.4), .mass = m, .pos = {0, 0}});
   pil_add_prismatic(w, pil_on(b, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
   pil_add_spring(w, pil_at(-1, 0), pil_on(b, 0, 0), k, 1.0);
   pil_add_damper(w, pil_at(-1, 0), pil_on(b, 0, 0), c);
-  struct { pil_body *b; double F0, w; } d = {b, F0, w0};
+  struct {
+    pil_body *b;
+    double F0;
+    double w;
+  } d = {b, F0, w0};
   pil_add_custom_force(w, res_push, &d);
   pil_world_advance(w, 8.0, 5e-4);
   double amp = 0;
   for (int i = 0; i < 2000; i++) {
     pil_world_advance(w, 1e-3, 5e-4);
-    if (fabs(b->pos.x) > amp) amp = fabs(b->pos.x);
+    if (fabs(b->pos.x) > amp)
+      amp = fabs(b->pos.x);
   }
   check("resonant amplitude", amp, F0 / (c * w0), 5e-4);
   pil_world_free(w);
