@@ -61,13 +61,13 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/collision  ./build/cycloid    ./build/doublependulum ./build/frame
 ./build/freebody   ./build/hoop       ./build/impact         ./build/incline
 ./build/kepler     ./build/linkage    ./build/loop           ./build/modes
-./build/phase      ./build/projectile ./build/pulleys        ./build/race
-./build/resonance  ./build/ring       ./build/swing          ./build/tower
-./build/top        ./build/shaker     ./build/waves
+./build/motor      ./build/phase      ./build/projectile     ./build/pulleys
+./build/race       ./build/resonance  ./build/ring           ./build/swing
+./build/tower      ./build/top        ./build/shaker         ./build/waves
 ## Electrodynamics / Circuits
-./build/bjt        ./build/bridge    ./build/cyclotron      ./build/exb
-./build/faraday    ./build/lc        ./build/rc             ./build/motor
-./build/opamp      ./build/rectifier ./build/rlc            ./build/transformer
+./build/bjt        ./build/bridge     ./build/cyclotron      ./build/exb
+./build/faraday    ./build/lc         ./build/rc             ./build/opamp
+./build/rectifier  ./build/rlc        ./build/transformer    ./build/zener
 
 make gallery
 ```

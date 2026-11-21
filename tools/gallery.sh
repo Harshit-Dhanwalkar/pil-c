@@ -47,12 +47,13 @@ bridge|10|Full-wave bridge rectifier with smoothing capacitor
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking
-rc|5|RC charging and discharging, time constant
 lc|5|LC tank: energy exchange between C and L
+rc|5|RC charging and discharging, time constant
+opamp|5|Inverting op-amp amplifier that saturates
 rectifier|5|Half-wave rectifier
 rlc|5|Series RLC driven by an AC source
 transformer|5|Step-up transformer with dot convention
-opamp|5|Inverting op-amp amplifier that saturates
+zener|5|Zener shunt regulator against supply ripple
 '
 
 CARDS=
