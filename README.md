@@ -66,8 +66,8 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/top        ./build/shaker     ./build/waves
 ## Electrodynamics / Circuits
 ./build/bjt        ./build/bridge    ./build/cyclotron      ./build/exb
-./build/faraday    ./build/motor     ./build/lc             ./build/rc
-./build/rectifier  ./build/rlc       ./build/transformer
+./build/faraday    ./build/lc        ./build/rc             ./build/motor
+./build/opamp      ./build/rectifier ./build/rlc            ./build/transformer
 
 make gallery
 ```
