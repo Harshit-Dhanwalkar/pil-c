@@ -37,8 +37,9 @@ pulleys|6|Pulley system
 race|16|Rolling down an incline: hoop, disc, sphere and a frictionless slider
 resonance|20|Swept-frequency drive: resonance curve of a damped oscillator
 ring|6|Ring of masses
-swing|8|Swinging Atwood machine with energy plot
+spherical|14|Spherical pendulum: conserved L_z, shadow rosette on the floor
 shaker|6|Shaker with a driven block, rolling disc and pendulum
+swing|8|Swinging Atwood machine with energy plot
 tower|8|Rotating tower with a sliding block and a pendulum (Lagrangian)
 top|4|Heavy symmetric top: precession and nutation
 waves|15|Standing waves on a bead chain: modes 1, 2 and 3

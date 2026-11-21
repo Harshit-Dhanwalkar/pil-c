@@ -64,6 +64,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/motor      ./build/phase      ./build/projectile     ./build/pulleys
 ./build/race       ./build/resonance  ./build/ring           ./build/swing
 ./build/tower      ./build/top        ./build/shaker         ./build/waves
+./build/spherical
 ## Electrodynamics / Circuits
 ./build/bjt        ./build/bridge     ./build/cyclotron      ./build/exb
 ./build/faraday    ./build/lc         ./build/rc             ./build/opamp
