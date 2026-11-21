@@ -1895,6 +1895,53 @@ static void test_helmholtz(void) {
         1, 0);
 }
 
+static void test_hohmann(void) {
+  puts("Hohmann transfer r1 = 1 -> r2 = 2: two burns, flight time, final "
+       "circle");
+  double a = 1.5;
+  double tof = 3.14159265358979 * sqrt(a * a * a);
+  double dt = 5e-4;
+  double dv1 = (sqrt(2.0 * 2 / 3) - 1);
+  double dv2 = sqrt(0.5) * (1 - sqrt(2.0 / 3));
+  double x = 1;
+  double y = 0;
+  double vx = 0;
+  double vy = 1;
+  double rmax = 0;
+  double rmin = 1e9;
+  int b1 = 0;
+  double b2 = (int)(tof / dt + 0.5);
+  double n = b2 + 12000;
+  for (int i = 0; i < n; i++) {
+    double r = hypot(x, y);
+    if (i == b1 || i == b2) {
+      double sp = hypot(vx, vy);
+      double dv = i == b1 ? dv1 : dv2;
+      vx += dv * vx / sp;
+      vy += dv * vy / sp;
+    }
+    if (i > b2 + 100 && r > rmax) {
+      rmax = r;
+    }
+    if (i > b2 + 100 && r < rmin) {
+      rmin = r;
+    }
+    double r3 = r * r * r;
+    vx -= 0.5 * dt * x / r3;
+    vy -= 0.5 * dt * y / r3;
+    x += dt * vx;
+    y += dt * vy;
+    r = hypot(x, y);
+    r3 = r * r * r;
+    vx -= 0.5 * dt * x / r3;
+    vy -= 0.5 * dt * y / r3;
+  }
+  check("final orbit is circular at r = 2 (rmax)", rmax, 2.0, 2e-3);
+  check("final orbit is circular at r = 2 (rmin)", rmin, 2.0, 2e-3);
+  check("specific energy = -1/(2 r2)",
+        0.5 * (vx * vx + vy * vy) - 1.0 / hypot(x, y), -0.25, 1e-3);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1940,6 +1987,7 @@ int main(void) {
   test_foucault();
   test_chaos();
   test_helmholtz();
+  test_hohmann();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

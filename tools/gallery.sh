@@ -25,6 +25,7 @@ foucault|30|Foucault pendulum: Coriolis force turns the swing plane
 frame|6|Sliding frame with sprung blocks and a two-link arm
 freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
 halfcar|6|Half-car on a wavy road
+hohmann|11|Hohmann transfer: two burns take a circular orbit to a larger one
 hoop|6|Bead on a rotating hoop: energy changes, Jacobi integral does not
 impact|8|Impact oscillator with a pendulum
 incline|6|Cylinder and block on a wedge
