@@ -1,14 +1,15 @@
 /*
  * frame.c - a sliding frame M holding two sprung blocks, with a two-link
  * pendulum (torsion knee kappa) on its left and a sprung link on its right,
- * pulled toward a wall by k_4. Everything is public-API; every point is given
- * in world coordinates and pil_on_at() turns it into a body anchor
+ * pulled toward a wall by k_4
+ * Everything is public-API; every point is given in world coordinates and
+ * pil_on_at() turns it into a body anchor
  */
 
 #include "example_main.h"
 #include <math.h>
 
-/* thick black link between world points p and q, mass m */
+// Thick black link between world points p and q, mass m
 static pil_body *link(pil_world *w, pil_vec2 p, pil_vec2 q, double m,
                       const char *label, double ldx, double ldy) {
   double len = hypot(q.x - p.x, q.y - p.y);

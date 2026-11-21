@@ -1778,6 +1778,46 @@ static void test_dipole(void) {
   (void)mumax;
 }
 
+static void test_foucault(void) {
+  puts("Foucault pendulum: swing plane turns at -Omega sin(lat)");
+  double W0 = 6.283185307179586, WR = 0.15, h = 0.002;
+  double s[4] = {1, 0, 0, 0};
+  double xs[30000];
+  double ys[30000];
+  for (int i = 0; i < 30000; i++) {
+    xs[i] = s[0];
+    ys[i] = s[1];
+    double k[4][4];
+    double u[4];
+    for (int st = 0; st < 4; st++) {
+      double c = st == 0 ? 0 : (st == 3 ? 1 : 0.5);
+      for (int j = 0; j < 4; j++) {
+        u[j] = s[j] + (st ? c * h * k[st - 1][j] : 0);
+      }
+      k[st][0] = u[2];
+      k[st][1] = u[3];
+      k[st][2] = -W0 * W0 * u[0] + 2 * WR * u[3];
+      k[st][3] = -W0 * W0 * u[1] - 2 * WR * u[2];
+    }
+    for (int j = 0; j < 4; j++)
+      s[j] += h / 6 * (k[0][j] + 2 * k[1][j] + 2 * k[2][j] + k[3][j]);
+  }
+  double sxx = 0;
+  double syy = 0;
+  double sxy = 0;
+  for (int j = 29500 - 500; j < 29500; j++) { // One period centred at t = 58.5
+    sxx += xs[j] * xs[j];
+    syy += ys[j] * ys[j];
+    sxy += xs[j] * ys[j];
+  }
+  double psi = 0.5 * atan2(2 * sxy, sxx - syy);
+  double want = -WR * 58.5;
+  want = fmod(want + 100 * 3.14159265358979,
+              3.14159265358979); // Plane angle is mod pi
+  psi = fmod(psi + 100 * 3.14159265358979, 3.14159265358979);
+  check("plane angle at t=58.5 s equals -W t (mod pi)", psi, want, 0.03);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1820,6 +1860,7 @@ int main(void) {
   test_rlc_response();
   test_boris();
   test_dipole();
+  test_foucault();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

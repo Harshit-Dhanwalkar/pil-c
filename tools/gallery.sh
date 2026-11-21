@@ -21,6 +21,7 @@ crank|6|Disc driving a crank and coupled sliders
 cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
 doppler|12|Doppler effect of a moving source: wavefronts and pulse counts
 doublependulum|20|Double pendulum from its Lagrangian, with a diverging twin
+foucault|30|Foucault pendulum: Coriolis force turns the swing plane
 frame|6|Sliding frame with sprung blocks and a two-link arm
 freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
 halfcar|6|Half-car on a wavy road
