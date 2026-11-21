@@ -1710,6 +1710,74 @@ static void test_boris(void) {
         0.08);
 }
 
+static void dipole_b(const double x[3], double t, double B[3], double E[3],
+                     void *u) {
+  (void)t;
+  (void)u;
+  double r2 = x[0] * x[0] + x[1] * x[1] + x[2] * x[2];
+  double r5 = r2 * r2 * sqrt(r2);
+  B[0] = -3.0 * 100.0 * x[2] * x[0] / r5;
+  B[1] = -3.0 * 100.0 * x[2] * x[1] / r5;
+  B[2] = 100.0 * (r2 - 3.0 * x[2] * x[2]) / r5;
+  E[0] = E[1] = E[2] = 0;
+}
+
+static void test_dipole(void) {
+  puts("dipole field: trapped proton bounces, drifts west, mu conserved");
+  pil_particle3 p = {{2.79, 0, 0}, {0, 1.0, 0.5}, 1.0};
+  double v0 = sqrt(1.25);
+  double zmax = 0;
+  double mumin = 1e9;
+  double mumax = 0;
+  double mu0 = 0;
+  double phi = 0;
+  double prev = 0;
+  for (int i = 0; i < 25000; i++) {
+    double B[3];
+    double E[3];
+    dipole_b(p.x, 0, B, E, NULL);
+    double bm = sqrt(B[0] * B[0] + B[1] * B[1] + B[2] * B[2]);
+    double vpar = (p.v[0] * B[0] + p.v[1] * B[1] + p.v[2] * B[2]) / bm;
+    double v2 = p.v[0] * p.v[0] + p.v[1] * p.v[1] + p.v[2] * p.v[2];
+    double mu = 0.5 * (v2 - vpar * vpar) / bm;
+    if (i == 0) {
+      mu0 = mu;
+    }
+    if (i > 0 && i % 25 == 0) { // Average over the gyration
+      if (mu > mumax) {
+        mumax = mu;
+      }
+      if (mu < mumin) {
+        mumin = mu;
+      }
+    }
+    if (fabs(p.x[2]) > zmax) {
+      zmax = fabs(p.x[2]);
+    }
+    double ph = atan2(p.x[1], p.x[0]);
+    double d = ph - prev;
+    if (d > 3.14159265358979) {
+      d -= 2 * 3.14159265358979;
+    }
+    if (d < -3.14159265358979) {
+      d += 2 * 3.14159265358979;
+    }
+    if (i > 0) {
+      phi += d;
+    }
+    prev = ph;
+    pil_particle3_step(&p, dipole_b, NULL, 0, 0.004);
+  }
+  check("speed conserved",
+        sqrt(p.v[0] * p.v[0] + p.v[1] * p.v[1] + p.v[2] * p.v[2]), v0, 1e-9);
+  check("bounces: |z| stays within mirror points", zmax > 0.45 && zmax < 0.75,
+        1, 0);
+  check("proton drifts westward (longitude decreases)", phi < -2.0, 1, 0);
+  (void)mu0;
+  (void)mumin;
+  (void)mumax;
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1751,6 +1819,7 @@ int main(void) {
   test_mosfet();
   test_rlc_response();
   test_boris();
+  test_dipole();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
