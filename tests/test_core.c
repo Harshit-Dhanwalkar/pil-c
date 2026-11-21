@@ -1552,7 +1552,8 @@ static int doppler_count(double xo, double t) {
   for (int i = 0; i * 0.6 <= t; i++) {
     double te = i * 0.6, xs = -3.0 + 0.5 * te;
     if (te + fabs(xo - xs) <= t) {
-      n++;}
+      n++;
+    }
   }
   return n;
 }
@@ -1601,10 +1602,45 @@ static void test_mosfet(void) {
     pil_nmos(c, out, in, z, 2e-3, 1.0, "Mn");
     pil_resistor(c, out, z, 1e9, "Rl");
     pil_world_advance(w, 1e-3, 1e-4);
-    check(k == 0 ? "inverter in=0 -> 5 V" : k == 1 ? "inverter in=5 -> 0 V" : "inverter in=2.5 -> 2.5 V",
+    check(k == 0   ? "inverter in=0 -> 5 V"
+          : k == 1 ? "inverter in=5 -> 0 V"
+                   : "inverter in=2.5 -> 2.5 V",
           pil_circuit_node_voltage(c, out), want[k], 0.05);
     pil_world_free(w);
   }
+}
+
+static double sine_f0(double t, void *u) {
+  (void)u;
+  return sin(2.0 * 3.14159265358979 * 503.29212 * t);
+}
+
+static void test_rlc_response(void) {
+  puts("series RLC at resonance: gain 1 across R, Q across C");
+  pil_world *w = pil_world_new();
+  pil_circuit *c = pil_add_circuit(w);
+  pil_node a = pil_circuit_node(c, 0, 1), n1 = pil_circuit_node(c, 1, 1),
+           n2 = pil_circuit_node(c, 2, 1), g = pil_circuit_node(c, 0, 0);
+  pil_circuit_ground(c, g);
+  pil_vsource_fn(c, a, g, sine_f0, NULL, "v");
+  pil_celement *r = pil_resistor(c, a, n1, 10.0, "R");
+  pil_inductor(c, n1, n2, 10e-3, 0.0, "L");
+  pil_celement *cap = pil_capacitor(c, n2, g, 10e-6, 0.0, "C");
+  pil_circuit_set_step(c, 2e-6);
+  pil_world_advance(w, 30e-3, 1e-4);
+  double vr = 0, vc = 0;
+  for (int i = 0; i < 4000; i++) {
+    pil_world_advance(w, 1e-6 * 5, 1e-4);
+    double a1 = fabs(10.0 * pil_celement_current(r)),
+           a2 = fabs(pil_celement_voltage(cap));
+    if (a1 > vr)
+      vr = a1;
+    if (a2 > vc)
+      vc = a2;
+  }
+  check("band-pass gain at f0", vr, 1.0, 0.01);
+  check("low-pass gain at f0 = Q", vc, sqrt(10e-3 / 10e-6) / 10.0, 0.03);
+  pil_world_free(w);
 }
 
 int main(void) {
@@ -1646,6 +1682,7 @@ int main(void) {
   test_spherical();
   test_doppler();
   test_mosfet();
+  test_rlc_response();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
