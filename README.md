@@ -55,7 +55,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/halfcar   --record half.gif 5 # simulate 5 s into a gif (mp4/webm also work)
 ./build/halfcar   --live              # interactive window
 
-# other examples
+# Other examples
 ## Mechanics
 ./build/atwood      ./build/blocks    ./build/bowl      ./build/crank
 ./build/collision   ./build/cycloid   ./build/frame     ./build/freebody
@@ -66,7 +66,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/waves
 ## Electrodynamics / Circuits
 ./build/bridge      ./build/cyclotron ./build/exb       ./build/faraday
-./build/motor       ./build/rectifier  ./build/rlc
+./build/motor       ./build/rc        ./build/rectifier ./build/rlc
 
 make gallery
 ```

@@ -44,6 +44,7 @@ bridge|10|Full-wave bridge rectifier with smoothing capacitor
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking
+rc|5|RC charging and discharging, time constant
 rectifier|5|Half-wave rectifier
 rlc|5|Series RLC driven by an AC source
 '
