@@ -1509,7 +1509,11 @@ static void test_double_pendulum(void) {
   pil_world_free(w);
 }
 
-typedef struct { double m, l, g; } sph_t;
+typedef struct {
+  double m;
+  double l;
+  double g;
+} sph_t;
 static double sph_T(const double *q, const double *qd, void *u) {
   const sph_t *p = u;
   double s = sin(q[0]);
@@ -1521,7 +1525,8 @@ static double sph_V(const double *q, void *u) {
 }
 
 static void test_spherical(void) {
-  puts("spherical pendulum: L_z and energy conserved, conical pendulum is steady");
+  puts("spherical pendulum: L_z and energy conserved, conical pendulum is "
+       "steady");
   sph_t p = {1.0, 1.0, 9.81};
   pil_world *w = pil_world_new();
   pil_lsys *s = pil_add_lagrangian(w, 2, sph_T, sph_V, &p);
@@ -1540,6 +1545,26 @@ static void test_spherical(void) {
   pil_world_advance(w, 10.0, 5e-4);
   check("conical pendulum keeps theta", pil_lsys_q(s)[0], th, 1e-6);
   pil_world_free(w);
+}
+
+static int doppler_count(double xo, double t) {
+  int n = 0;
+  for (int i = 0; i * 0.6 <= t; i++) {
+    double te = i * 0.6, xs = -3.0 + 0.5 * te;
+    if (te + fabs(xo - xs) <= t) {
+      n++;}
+  }
+  return n;
+}
+
+static void test_doppler(void) {
+  puts("doppler: reception rates f / (1 -+ v/c)");
+  double f = 1.0 / 0.6;
+  double ra = (doppler_count(5.5, 16.0) - doppler_count(5.5, 10.0)) /
+              6.0; // Source passes A at t = 17
+  double rb = (doppler_count(-5.5, 60.0) - doppler_count(-5.5, 30.0)) / 30.0;
+  check("observer ahead: f / (1 - v/c)", ra, f / 0.5, 0.4);
+  check("observer behind: f / (1 + v/c)", rb, f / 1.5, 0.05);
 }
 
 int main(void) {
@@ -1579,6 +1604,7 @@ int main(void) {
   test_hoop();
   test_double_pendulum();
   test_spherical();
+  test_doppler();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
