@@ -23,6 +23,7 @@ doublependulum|20|Double pendulum from its Lagrangian, with a diverging twin
 frame|6|Sliding frame with sprung blocks and a two-link arm
 freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
 halfcar|6|Half-car on a wavy road
+hoop|6|Bead on a rotating hoop: energy changes, Jacobi integral does not
 impact|8|Impact oscillator with a pendulum
 incline|6|Cylinder and block on a wedge
 kepler|7|Kepler orbit with equal-area wedges
