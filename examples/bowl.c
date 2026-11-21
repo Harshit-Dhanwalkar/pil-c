@@ -2,7 +2,7 @@
  * bowl.c - a bowl (annular sector) rolling on ground between two springs, a
  * ball rolling inside it, and a T-shaped pendulum with two end masses hinged at
  * ball's centre and tied to bowl by a torsion spring
- * Public API only
+ * Everything Public is API
  */
 
 #include "example_main.h"

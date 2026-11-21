@@ -7,8 +7,6 @@
  * pil_lagrange.h - systems written in generalised coordinates, plus a small 3D
  * projection helper for drawing them
  *
- * Some textbook figures (a rotating tower with a sliding block and a pendulum,
- * a spinning rigid body) are 3D, and equations of motion are whole point
  * Give kinetic energy T(q, qdot) and potential V(q) of figure; Euler-Lagrange
  * equations
  *
@@ -79,6 +77,20 @@ void pil_rigid3_omega(const double *q, const double *qd, double w_body[3]);
  * momentum I w is along space z; phi0 (rotation about L) is free */
 void pil_rigid3_state(const pil_rigid3 *p, const double w_body[3], double phi0,
                       double *q, double *qd);
+
+/* Charged particle in 3D with given fields (any E(x, t), B(x, t)), advanced
+ * with Boris pusher: second order, and |v| is conserved exactly in a pure
+ * magnetic field
+ * q_m is charge over mass */
+typedef void (*pil_field3_fn)(const double x[3], double t, double B[3],
+                              double E[3], void *user);
+typedef struct {
+  double x[3];
+  double v[3];
+  double q_m;
+} pil_particle3;
+void pil_particle3_step(pil_particle3 *p, pil_field3_fn field, void *user,
+                        double t, double dt);
 
 /* Orthographic view of a z-up 3D scene: projected point is in same world units
  * as rest of figure, so annotations can use it. yaw turns scene about z, pitch

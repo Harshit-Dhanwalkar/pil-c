@@ -340,7 +340,7 @@ void pil_rigid3_state(const pil_rigid3 *p, const double w[3], double phi0,
                       double *q, double *qd) {
   double L[3] = {p->I[0] * w[0], p->I[1] * w[1], p->I[2] * w[2]};
   double Lm = sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
-  // space z seen from the body is (sin th sin psi, sin th cos psi, cos th)
+  // Space z seen from the body is (sin th sin psi, sin th cos psi, cos th)
   double th = acos(L[2] / Lm);
   double ps = atan2(L[0], L[1]);
   double st = sin(th);
@@ -354,4 +354,34 @@ void pil_rigid3_state(const pil_rigid3 *p, const double w[3], double phi0,
   qd[0] = phid;
   qd[1] = w[0] * cp - w[1] * sp;
   qd[2] = w[2] - phid * ct;
+}
+
+void pil_particle3_step(pil_particle3 *p, pil_field3_fn field, void *user,
+                        double t, double dt) {
+  double B[3] = {0, 0, 0};
+  double E[3] = {0, 0, 0};
+  field(p->x, t, B, E, user);
+
+  double h = 0.5 * p->q_m * dt;
+  double vm[3];
+  double tv[3];
+  double vp[3];
+  for (int i = 0; i < 3; i++) {
+    vm[i] = p->v[i] + h * E[i];
+    tv[i] = h * B[i];
+  }
+
+  double t2 = tv[0] * tv[0] + tv[1] * tv[1] + tv[2] * tv[2];
+  double f = 2.0 / (1.0 + t2);
+  vp[0] = vm[0] + vm[1] * tv[2] - vm[2] * tv[1];
+  vp[1] = vm[1] + vm[2] * tv[0] - vm[0] * tv[2];
+  vp[2] = vm[2] + vm[0] * tv[1] - vm[1] * tv[0];
+  double sv[3] = {f * tv[0], f * tv[1], f * tv[2]};
+  double vq[3] = {vm[0] + vp[1] * sv[2] - vp[2] * sv[1],
+                  vm[1] + vp[2] * sv[0] - vp[0] * sv[2],
+                  vm[2] + vp[0] * sv[1] - vp[1] * sv[0]};
+  for (int i = 0; i < 3; i++) {
+    p->v[i] = vq[i] + h * E[i];
+    p->x[i] += p->v[i] * dt;
+  }
 }

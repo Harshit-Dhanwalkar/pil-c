@@ -1643,6 +1643,73 @@ static void test_rlc_response(void) {
   pil_world_free(w);
 }
 
+static void uniform_b(const double x[3], double t, double B[3], double E[3],
+                      void *u) {
+  (void)x;
+  (void)t;
+  (void)u;
+  B[0] = B[1] = 0;
+  B[2] = 2.0;
+  E[0] = E[1] = E[2] = 0;
+}
+
+static void bottle_b(const double x[3], double t, double B[3], double E[3],
+                     void *u) {
+  (void)t;
+  (void)u;
+  B[0] = -3.0 * x[0] * x[2] / 9.0;
+  B[1] = -3.0 * x[1] * x[2] / 9.0;
+  B[2] = 3.0 * (1.0 + x[2] * x[2] / 9.0);
+  E[0] = E[1] = E[2] = 0;
+}
+
+static void test_boris(void) {
+  puts("charged particle pusher: gyration and magnetic bottle");
+  pil_particle3 p = {{1, 0, 0}, {0, 2.0, 0.5}, 1.0};
+  double v0 = sqrt(4.0 + 0.25);
+  // omega = qB/m = 2: after one period 2 pi / 2 the particle is back in x, y
+  int n = 3142;
+  double dt = 3.14159265358979 / n;
+  for (int i = 0; i < n; i++)
+    pil_particle3_step(&p, uniform_b, NULL, 0, dt);
+  check("speed conserved",
+        sqrt(p.v[0] * p.v[0] + p.v[1] * p.v[1] + p.v[2] * p.v[2]), v0, 1e-12);
+  check("gyro-radius circle closes (x)", p.x[0], 1.0, 2e-4);
+  check("drift along B (z = v_par T)", p.x[2], 0.5 * 3.14159265358979, 1e-6);
+  // Bottle: mu = v_perp^2 / (2 B) conserved, mirror point z_m = L sqrt(1/sin^2
+  // - 1)
+  pil_particle3 q = {{0.33, 0, 0}, {0, 1.0, 0.35}, 1.0};
+  double mu0 = 0;
+  double mumax = 0;
+  double mumin = 1e9;
+  double zmax = 0;
+  for (int i = 0; i < 15000; i++) {
+    double B[3];
+    double E[3];
+    bottle_b(q.x, 0, B, E, NULL);
+    double bm = sqrt(B[0] * B[0] + B[1] * B[1] + B[2] * B[2]);
+    double vpar = (q.v[0] * B[0] + q.v[1] * B[1] + q.v[2] * B[2]) / bm;
+    double v2 = q.v[0] * q.v[0] + q.v[1] * q.v[1] + q.v[2] * q.v[2];
+    double mu = 0.5 * (v2 - vpar * vpar) / bm;
+    if (i == 0) {
+      mu0 = mu;
+    }
+    if (mu > mumax) {
+      mumax = mu;
+    }
+    if (mu < mumin) {
+      mumin = mu;
+    }
+    if (fabs(q.x[2]) > zmax) {
+      zmax = fabs(q.x[2]);
+    }
+    pil_particle3_step(&q, bottle_b, NULL, 0, 0.004);
+  }
+  check("mu varies by less than 2 %", (mumax - mumin) / mu0 < 0.02, 1, 0);
+  check("mirror point z_m = L sqrt(v_par^2 / v_perp^2)", zmax, 3.0 * 0.35,
+        0.08);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1683,6 +1750,7 @@ int main(void) {
   test_doppler();
   test_mosfet();
   test_rlc_response();
+  test_boris();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
