@@ -57,17 +57,17 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 
 # Other examples
 ## Mechanics
-./build/atwood     ./build/blocks    ./build/bowl       ./build/crank
-./build/collision  ./build/cycloid   ./build/doublependulum
-./build/frame      ./build/freebody  ./build/hoop       ./build/impact
-./build/incline    ./build/kepler    ./build/linkage    ./build/loop
-./build/modes      ./build/phase     ./build/projectile ./build/pulleys
-./build/race       ./build/resonance ./build/ring       ./build/swing
-./build/tower      ./build/top       ./build/shaker     ./build/waves
+./build/atwood     ./build/blocks     ./build/bowl           ./build/crank
+./build/collision  ./build/cycloid    ./build/doublependulum ./build/frame
+./build/freebody   ./build/hoop       ./build/impact         ./build/incline
+./build/kepler     ./build/linkage    ./build/loop           ./build/modes
+./build/phase      ./build/projectile ./build/pulleys        ./build/race
+./build/resonance  ./build/ring       ./build/swing          ./build/tower
+./build/top        ./build/shaker     ./build/waves
 ## Electrodynamics / Circuits
-./build/bjt        ./build/bridge     ./build/cyclotron ./build/exb
-./build/faraday    ./build/motor      ./build/lc        ./build/rc
-./build/rectifier  ./build/rlc
+./build/bjt        ./build/bridge    ./build/cyclotron      ./build/exb
+./build/faraday    ./build/motor     ./build/lc             ./build/rc
+./build/rectifier  ./build/rlc       ./build/transformer
 
 make gallery
 ```

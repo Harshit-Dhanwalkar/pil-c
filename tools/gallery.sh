@@ -51,6 +51,7 @@ rc|5|RC charging and discharging, time constant
 lc|5|LC tank: energy exchange between C and L
 rectifier|5|Half-wave rectifier
 rlc|5|Series RLC driven by an AC source
+transformer|5|Step-up transformer with dot convention
 '
 
 CARDS=
