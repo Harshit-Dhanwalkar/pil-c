@@ -909,7 +909,6 @@ static void test_rigid3(void) {
   pil_world_free(w);
 }
 
-
 static void test_trace(void) {
   puts("traces");
   pil_world *w = pil_world_new();
@@ -1218,6 +1217,32 @@ static void test_bead_chain(void) {
   }
 }
 
+static void test_roll_race(void) {
+  puts("rolling race: a = g sin(alpha) / (1 + I / m R^2)");
+  const double al = 25.0 * 3.14159265358979 / 180.0;
+  const double R = 0.2;
+  const double g = 9.81;
+  const double kI[3] = {1.0, 0.5, 0.4};
+  for (int i = 0; i < 3; i++) {
+    pil_world *w = pil_world_new();
+    pil_vec2 dir = {cos(al), -sin(al)}, nrm = {sin(al), cos(al)};
+    pil_body *b =
+        pil_add_body(w, &(pil_body_desc){.shape = pil_disc(R),
+                                         .mass = 1.0,
+                                         .inertia = kI[i] * R * R,
+                                         .pos = {nrm.x * R, nrm.y * R}});
+    pil_add_rolling(w, b, (pil_vec2){0, 0}, R, (pil_vec2){0, 0}, dir);
+    pil_world_advance(w, 1.0, 1e-3);
+    double s = b->pos.x * dir.x + b->pos.y * dir.y -
+               (nrm.x * dir.x + nrm.y * dir.y) * R;
+    check(i == 0   ? "hoop distance in 1 s"
+          : i == 1 ? "disc distance in 1 s"
+                   : "sphere distance in 1 s",
+          s, 0.5 * g * sin(al) / (1.0 + kI[i]), 1e-3);
+    pil_world_free(w);
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1248,6 +1273,7 @@ int main(void) {
   test_collision();
   test_modes();
   test_bead_chain();
+  test_roll_race();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

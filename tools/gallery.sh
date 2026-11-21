@@ -13,30 +13,31 @@ mkdir -p "$OUT/assets"
 
 # name | seconds | title
 LIST='
-halfcar|6|Half-car on a wavy road
-incline|6|Cylinder and block on a wedge
 atwood|6|Atwood machine
 blocks|6|Two blocks with pendulums
 bowl|6|Circle rolling inside a circle
+collision|10|Two-disc collision in lab and CM frames, momentum arrows
 crank|6|Disc driving a crank and coupled sliders
+cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
 frame|6|Sliding frame with sprung blocks and a two-link arm
-ring|6|Ring of masses
-pulleys|6|Pulley system
-swing|8|Swinging Atwood machine with energy plot
+freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
+halfcar|6|Half-car on a wavy road
 impact|8|Impact oscillator with a pendulum
+incline|6|Cylinder and block on a wedge
+kepler|7|Kepler orbit with equal-area wedges
+modes|11|Coupled oscillators: normal modes and energy beats
+motor|5|DC motor driving a flywheel
+linkage|6|Parallelogram linkage with a rolling disc, slider and double pendulum
 loop|5|Loop-the-loop
+phase|14|Damped pendulum with a phase-portrait plot
+projectile|5|Projectile with and without drag: traces and vectors
+pulleys|6|Pulley system
+race|16|Rolling down an incline: hoop, disc, sphere and a frictionless slider
+ring|6|Ring of masses
+swing|8|Swinging Atwood machine with energy plot
+shaker|6|Shaker with a driven block, rolling disc and pendulum
 tower|8|Rotating tower with a sliding block and a pendulum (Lagrangian)
 top|4|Heavy symmetric top: precession and nutation
-linkage|6|Parallelogram linkage with a rolling disc, slider and double pendulum
-shaker|6|Shaker with a driven block, rolling disc and pendulum
-projectile|5|Projectile with and without drag: traces and vectors
-cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
-kepler|7|Kepler orbit with equal-area wedges
-collision|10|Two-disc collision in lab and CM frames, momentum arrows
-modes|11|Coupled oscillators: normal modes and energy beats
-freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
-motor|5|DC motor driving a flywheel
-phase|14|Damped pendulum with a phase-portrait plot
 waves|15|Standing waves on a bead chain: modes 1, 2 and 3
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
