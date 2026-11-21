@@ -56,16 +56,16 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/halfcar   --live              # interactive window
 
 # other examples
-## mechanics
-./build/atwood    ./build/blocks  ./build/bowl   ./build/crank
-./build/collision ./build/cycloid ./build/frame  ./build/freebody
-./build/impact    ./build/incline ./build/kepler ./build/linkage
-./build/loop      ./build/modes   ./build/phase  ./build/projectile
-./build/pulleys   ./build/race    ./build/ring   ./build/swing
-./build/tower     ./build/top     ./build/shaker ./build/waves
-## Electrodynamics / circuits
-./build/cyclotron ./build/exb     ./build/faraday ./build/motor
-./build/rlc       ./build/rectifier
+## Mechanics
+./build/atwood      ./build/blocks    ./build/bowl      ./build/crank
+./build/collision   ./build/cycloid   ./build/frame     ./build/freebody
+./build/impact      ./build/incline   ./build/kepler    ./build/linkage
+./build/loop        ./build/modes     ./build/phase     ./build/projectile
+./build/pulleys     ./build/race      ./build/ring      ./build/swing
+./build/tower       ./build/top       ./build/shaker    ./build/waves
+## Electrodynamics / Circuits
+./build/bridge      ./build/cyclotron ./build/exb       ./build/faraday
+./build/motor       ./build/rectifier ./build/resonance ./build/rlc     
 
 make gallery
 ```

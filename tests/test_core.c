@@ -1243,6 +1243,38 @@ static void test_roll_race(void) {
   }
 }
 
+static void test_bridge_rectifier(void) {
+  puts("bridge rectifier: v_load stays positive, ripple small, ~ peak - 2 "
+       "diode drops");
+  pil_world *w = pil_world_new();
+  pil_circuit *c = pil_add_circuit(w);
+  pil_node a = pil_circuit_node(c, 0, 1), b = pil_circuit_node(c, 0, 0),
+           p = pil_circuit_node(c, 2, 2), n = pil_circuit_node(c, 2, -1);
+  pil_circuit_ground(c, n);
+  pil_vsource_ac(c, a, b, 12.0, 400.0, 0.0, "v");
+  pil_diode(c, a, p, 1e-12, 0.04, "");
+  pil_diode(c, b, p, 1e-12, 0.04, "");
+  pil_diode(c, n, a, 1e-12, 0.04, "");
+  pil_diode(c, n, b, 1e-12, 0.04, "");
+  pil_celement *r = pil_resistor(c, p, n, 500.0, "R");
+  pil_capacitor(c, p, n, 20e-6, 0.0, "C");
+  pil_world_advance(w, 10e-3, 1e-4);
+  double lo = 1e9; double hi = -1e9;
+  for (int i = 0; i < 100; i++) {
+    pil_world_advance(w, 5e-5, 1e-4);
+    double v = pil_celement_voltage(r);
+    if (v < lo) {
+      lo = v;}
+    if (v > hi) {
+      hi = v;}
+  }
+  check("no negative load voltage", lo > 0.0, 1, 0);
+  check("ripple under 1.5 V", hi - lo < 1.5, 1, 0);
+  check("peak near 12 V - 2 diode drops (n_vt ln(I/Is) each)", hi,
+        12.0 - 2 * 0.04 * log(0.03 / 1e-12), 1.0);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1274,6 +1306,7 @@ int main(void) {
   test_modes();
   test_bead_chain();
   test_roll_race();
+  test_bridge_rectifier();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
