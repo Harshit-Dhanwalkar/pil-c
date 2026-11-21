@@ -1509,6 +1509,39 @@ static void test_double_pendulum(void) {
   pil_world_free(w);
 }
 
+typedef struct { double m, l, g; } sph_t;
+static double sph_T(const double *q, const double *qd, void *u) {
+  const sph_t *p = u;
+  double s = sin(q[0]);
+  return 0.5 * p->m * p->l * p->l * (qd[0] * qd[0] + s * s * qd[1] * qd[1]);
+}
+static double sph_V(const double *q, void *u) {
+  const sph_t *p = u;
+  return -p->m * p->g * p->l * cos(q[0]);
+}
+
+static void test_spherical(void) {
+  puts("spherical pendulum: L_z and energy conserved, conical pendulum is steady");
+  sph_t p = {1.0, 1.0, 9.81};
+  pil_world *w = pil_world_new();
+  pil_lsys *s = pil_add_lagrangian(w, 2, sph_T, sph_V, &p);
+  pil_lsys_set_state(s, (double[]){0.9, 0}, (double[]){0, 2.2});
+  double lz0 = sin(0.9) * sin(0.9) * 2.2, e0 = pil_lsys_jacobi(s);
+  pil_world_advance(w, 20.0, 5e-4);
+  double st = sin(pil_lsys_q(s)[0]);
+  check("L_z drift", st * st * pil_lsys_qd(s)[1] - lz0, 0.0, 1e-6);
+  check("energy drift", pil_lsys_jacobi(s) - e0, 0.0, 1e-6);
+  pil_world_free(w);
+  // Circular motion: phi'^2 = g / (l cos th)
+  w = pil_world_new();
+  s = pil_add_lagrangian(w, 2, sph_T, sph_V, &p);
+  double th = 0.7;
+  pil_lsys_set_state(s, (double[]){th, 0}, (double[]){0, sqrt(9.81 / cos(th))});
+  pil_world_advance(w, 10.0, 5e-4);
+  check("conical pendulum keeps theta", pil_lsys_q(s)[0], th, 1e-6);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1545,6 +1578,7 @@ int main(void) {
   test_devices();
   test_hoop();
   test_double_pendulum();
+  test_spherical();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
