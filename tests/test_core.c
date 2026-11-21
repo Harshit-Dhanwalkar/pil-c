@@ -1859,6 +1859,42 @@ static void test_chaos(void) {
   check("separation grew by > 1e4 in 40 drive periods", d > 1e4 * d0, 1, 0);
 }
 
+static void test_helmholtz(void) {
+  puts("Biot-Savart: loop on-axis field and Helmholtz flatness");
+  // Unit current, mu0/4pi = 1: loop of radius 1 gives B_z = 2 pi / (1 +
+  // z^2)^(3/2)
+  double d = 1.0, B[3];
+  for (int k = 0; k < 3; k++) {
+    double z = 0.2 * k - 0.2;
+    double tot = 0;
+    for (int l = 0; l < 2; l++) {
+      double z0 = l ? d / 2 : -d / 2;
+      double bz = 0;
+      for (int i = 0; i < 400; i++) {
+        double ph = 2 * 3.14159265358979 * (i + 0.5) / 400;
+        double dph = 2 * 3.14159265358979 / 400;
+        double px = cos(ph);
+        double py = sin(ph);
+        double dlx = -py * dph;
+        double dly = px * dph;
+        double rx = -px;
+        double ry = -py;
+        double rz = z - z0;
+        double r3 = pow(rx * rx + ry * ry + rz * rz, 1.5);
+        bz += (dlx * ry - dly * rx) / r3;
+      }
+      tot += bz;
+      check("single loop vs 2 pi / (1+z^2)^1.5", bz,
+            2 * 3.14159265358979 / pow(1 + (z - z0) * (z - z0), 1.5), 1e-6);
+    }
+    B[k] = tot;
+  }
+  check("Helmholtz: B(+-0.2) matches B(0) to < 0.5 % (flat)",
+        fabs(B[0] - 0.5 * (B[0] + B[2])) < 1e-9 &&
+            fabs(B[0] / B[1] - 1) < 0.005,
+        1, 0);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1903,6 +1939,7 @@ int main(void) {
   test_dipole();
   test_foucault();
   test_chaos();
+  test_helmholtz();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

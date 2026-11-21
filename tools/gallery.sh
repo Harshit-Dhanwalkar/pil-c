@@ -55,6 +55,7 @@ cmos|5|CMOS inverter: transfer curve and shoot-through current
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking
+helmholtz|10|Helmholtz coils: Biot-Savart field lines as the separation grows
 lc|5|LC tank: energy exchange between C and L
 rc|5|RC charging and discharging, time constant
 opamp|5|Inverting op-amp amplifier that saturates
