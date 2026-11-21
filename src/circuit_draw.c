@@ -323,7 +323,9 @@ static void draw_device(cairo_t *cr, const pil_circuit *c, const pil_view *v,
   pil_vec2 P1 = node_px(c, v, d->n[1]);
   pil_vec2 P2 = node_px(c, v, d->n[2]);
   cairo_set_line_width(cr, st->line_w);
-  double lx, ly; // label anchor
+  // Label anchor
+  double lx;
+  double ly;
 
   if (d->kind == DEV_OPAMP) {
     double yc = 0.5 * (P0.y + P1.y);
@@ -346,6 +348,36 @@ static void draw_device(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     plus_sign(cr, xl + 8, P1.y, 0);
     lx = 0.5 * (xl + xo) - 6;
     ly = yc + H + 12;
+  } else if (d->kind == DEV_NMOS || d->kind == DEV_PMOS) {
+    // Gate plate, split channel; drain/source leads leave channel ends
+    double ym = 0.5 * (P0.y + P2.y);
+    double h = 0.5 * fabs(P2.y - P0.y);
+    double sg = P2.y > P0.y ? 1.0 : -1.0; // +1: source below drain
+    double xc = P0.x, xg = xc - 22, xch = xc - 14;
+    double yd = ym - sg * 0.45 * h, ys = ym + sg * 0.45 * h;
+
+    line(cr, P1.x, P1.y, xg, ym);
+    cairo_set_line_width(cr, st->line_w * 1.6);
+    line(cr, xg, ym - 0.42 * h, xg, ym + 0.42 * h);
+    cairo_set_line_width(cr, st->line_w * 1.6);
+    line(cr, xch, ym - sg * 0.5 * h, xch, ym - sg * 0.3 * h);
+    line(cr, xch, ym - 0.12 * h, xch, ym + 0.12 * h);
+    line(cr, xch, ym + sg * 0.3 * h, xch, ym + sg * 0.5 * h);
+    cairo_set_line_width(cr, st->line_w);
+    line(cr, xch, yd, xc, yd);
+    line(cr, xc, yd, P0.x, P0.y);
+    line(cr, xch, ys, xc, ys);
+    line(cr, xc, ys, P2.x, P2.y);
+    // Body arrow on middle segment: into channel for n, out for p
+    line(cr, xch, ym, xch + 8, ym);
+    if (d->kind == DEV_NMOS) {
+      arrow_head(cr, xch + 1, ym, -1, 0);
+    } else {
+      arrow_head(cr, xch + 9, ym, 1, 0);
+    }
+
+    lx = xc + 12;
+    ly = ym;
   } else {
     double ym = 0.5 * (P0.y + P2.y);
     double h = 0.5 * fabs(P2.y - P0.y);

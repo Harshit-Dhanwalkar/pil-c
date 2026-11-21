@@ -265,6 +265,58 @@ pil_cdevice *pil_pnp(pil_circuit *c, pil_node collector, pil_node base,
   return d;
 }
 
+pil_cdevice *pil_nmos(pil_circuit *c, pil_node drain, pil_node gate,
+                      pil_node source, double K, double vth,
+                      const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_NMOS, drain, gate, source, label);
+  d->beta = K;
+  d->vth = vth;
+
+  return d;
+}
+
+pil_cdevice *pil_pmos(pil_circuit *c, pil_node drain, pil_node gate,
+                      pil_node source, double K, double vth,
+                      const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_PMOS, drain, gate, source, label);
+  d->beta = K;
+  d->vth = vth;
+
+  return d;
+}
+
+// Level-1 current in nmos sense: i_d(vgs, vds) with its gm, gds; source and
+// drain swap roles when vds < 0
+static void mos_eval(double K, double vth, double vgs, double vds, double *id,
+                     double *gm, double *gds) {
+  const double lam = 0.02;
+  if (vds < 0.0) {
+    double i;
+    double g1;
+    double g2;
+    mos_eval(K, vth, vgs - vds, -vds, &i, &g1, &g2);
+    *id = -i;
+    *gm = -g1;
+    *gds = g1 + g2;
+
+    return;
+  }
+
+  double vov = vgs - vth;
+  if (vov <= 0.0) {
+    *id = *gm = *gds = 0.0;
+  } else if (vds < vov) { // Triode
+    *id = K * (vov * vds - 0.5 * vds * vds);
+    *gm = K * vds;
+    *gds = K * (vov - vds);
+  } else { // Saturation
+    double f = 1.0 + lam * (vds - vov);
+    *id = 0.5 * K * vov * vov * f;
+    *gm = K * vov * f - 0.5 * K * vov * vov * lam;
+    *gds = 0.5 * K * vov * vov * lam;
+  }
+}
+
 double pil_cdevice_current(const pil_cdevice *d, int term) {
   return term >= 0 && term < 3 ? d->ti[term] : 0.0;
 }
@@ -782,6 +834,39 @@ static int step_once(pil_circuit *c, double h) {
         }
 
         rhs[br] = f - g * d->v1;
+      } else if (d->kind == DEV_NMOS || d->kind == DEV_PMOS) {
+        const double sg = d->kind == DEV_NMOS ? 1.0 : -1.0;
+        double id0;
+        double gm;
+        double gds;
+        mos_eval(d->beta, d->vth, d->v1, d->v2, &id0, &gm, &gds);
+        double k = sg * id0 - gm * sg * d->v1 - gds * sg * d->v2;
+        // Current into the drain: k + gm (vG - vS) + gds (vD - vS)
+        if (i0 >= 0) {
+          AT(i0, i0) += gds;
+          if (i1 >= 0) {
+            AT(i0, i1) += gm;
+          }
+
+          if (i2 >= 0) {
+            AT(i0, i2) -= gm + gds;
+          }
+
+          rhs[i0] -= k;
+        }
+
+        if (i2 >= 0) {
+          AT(i2, i2) += gm + gds;
+          if (i1 >= 0) {
+            AT(i2, i1) -= gm;
+          }
+
+          if (i0 >= 0) {
+            AT(i2, i0) -= gds;
+          }
+
+          rhs[i2] += k;
+        }
       } else {
         // Ebers-Moll in the sign convention of an npn (s = -1 mirrors a pnp);
         // current into a terminal is  k + a (vB - vE) + b (vB - vC)
@@ -867,6 +952,30 @@ static int step_once(pil_circuit *c, double h) {
         }
 
         d->v1 = iter > 20 ? 0.5 * (d->v1 + vs) : vs;
+      } else if (d->kind == DEV_NMOS || d->kind == DEV_PMOS) {
+        const double sg = d->kind == DEV_NMOS ? 1.0 : -1.0;
+        double vgs = sg * (v1 - v2), vds = sg * (v0 - v2);
+        if (fabs(vgs - d->v1) > 1e-9 + 1e-6 * fabs(vgs) ||
+            fabs(vds - d->v2) > 1e-9 + 1e-6 * fabs(vds)) {
+          converged = 0;
+        }
+
+        double w_ = iter > 20 ? 0.5 : 1.0; // Damp late iterations
+        double dg = vgs - d->v1, dd = vds - d->v2;
+        if (dg > 2.0) {
+          dg = 2.0;
+        }
+        if (dg < -2.0) {
+          dg = -2.0;
+        }
+        if (dd > 2.0) {
+          dd = 2.0;
+        }
+        if (dd < -2.0) {
+          dd = -2.0;
+        }
+        d->v1 += w_ * dg;
+        d->v2 += w_ * dd;
       } else {
         const double sg = d->kind == DEV_NPN ? 1.0 : -1.0;
         double vbe = sg * (v1 - v2), vbc = sg * (v1 - v0);
@@ -976,6 +1085,15 @@ static int step_once(pil_circuit *c, double h) {
     if (d->kind == DEV_OPAMP) {
       d->ti[0] = d->ti[1] = 0.0;
       d->ti[2] = rhs[d->branch];
+    } else if (d->kind == DEV_NMOS || d->kind == DEV_PMOS) {
+      const double sg = d->kind == DEV_NMOS ? 1.0 : -1.0;
+      double id0;
+      double gm;
+      double gds;
+      mos_eval(d->beta, d->vth, d->v1, d->v2, &id0, &gm, &gds);
+      d->ti[0] = sg * id0;
+      d->ti[1] = 0.0;
+      d->ti[2] = -sg * id0;
     } else {
       const double sg = d->kind == DEV_NPN ? 1.0 : -1.0;
       double eF = exp(fmin(d->v1 / BJT_VT, 80.0));

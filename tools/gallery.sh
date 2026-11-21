@@ -46,6 +46,7 @@ top|4|Heavy symmetric top: precession and nutation
 waves|15|Standing waves on a bead chain: modes 1, 2 and 3
 bjt|5|Common-emitter transistor amplifier
 bridge|10|Full-wave bridge rectifier with smoothing capacitor
+cmos|5|CMOS inverter: transfer curve and shoot-through current
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking

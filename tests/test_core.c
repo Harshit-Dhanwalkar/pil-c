@@ -1567,6 +1567,46 @@ static void test_doppler(void) {
   check("observer behind: f / (1 + v/c)", rb, f / 1.5, 0.05);
 }
 
+static void test_mosfet(void) {
+  puts("mosfet: square law, cmos inverter");
+  // Common-Source NMOS: Id = K/2 (Vgs - Vth)^2 (1 + 0.02 (Vds - Vov))
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node vdd = pil_circuit_node(c, 0, 3), d = pil_circuit_node(c, 2, 2),
+             g = pil_circuit_node(c, 0, 1), z = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, z);
+    pil_vsource_dc(c, vdd, z, 5.0, "Vdd");
+    pil_vsource_dc(c, g, z, 2.0, "Vg");
+    pil_resistor(c, vdd, d, 1e3, "R");
+    pil_cdevice *m = pil_nmos(c, d, g, z, 2e-3, 1.0, "M");
+    pil_world_advance(w, 1e-3, 1e-4);
+    double vds = pil_circuit_node_voltage(c, d), id = pil_cdevice_current(m, 0);
+    check("saturation current", id, 1e-3 * (1.0 + 0.02 * (vds - 1.0)), 1e-9);
+    check("KCL: drain resistor current = Id", (5.0 - vds) / 1e3, id, 1e-9);
+    check("gate draws no current", pil_cdevice_current(m, 1), 0.0, 1e-15);
+    pil_world_free(w);
+  }
+  // CMOS inverter: low in -> high out, high in -> low out, midpoint at Vdd / 2
+  double vin[3] = {0.0, 5.0, 2.5}, want[3] = {5.0, 0.0, 2.5};
+  for (int k = 0; k < 3; k++) {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node vdd = pil_circuit_node(c, 2, 4), out = pil_circuit_node(c, 2, 2),
+             in = pil_circuit_node(c, 0, 2), z = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, z);
+    pil_vsource_dc(c, vdd, z, 5.0, "Vdd");
+    pil_vsource_dc(c, in, z, vin[k], "Vin");
+    pil_pmos(c, out, in, vdd, 2e-3, 1.0, "Mp");
+    pil_nmos(c, out, in, z, 2e-3, 1.0, "Mn");
+    pil_resistor(c, out, z, 1e9, "Rl");
+    pil_world_advance(w, 1e-3, 1e-4);
+    check(k == 0 ? "inverter in=0 -> 5 V" : k == 1 ? "inverter in=5 -> 0 V" : "inverter in=2.5 -> 2.5 V",
+          pil_circuit_node_voltage(c, out), want[k], 0.05);
+    pil_world_free(w);
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1605,6 +1645,7 @@ int main(void) {
   test_double_pendulum();
   test_spherical();
   test_doppler();
+  test_mosfet();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

@@ -59,14 +59,15 @@ struct pil_celement {
   double anim_phase; /* \int i dt — drives current-dot motion         */
 };
 
-typedef enum { DEV_OPAMP, DEV_NPN, DEV_PNP } pil_dev_kind;
+typedef enum { DEV_OPAMP, DEV_NPN, DEV_PNP, DEV_NMOS, DEV_PMOS } pil_dev_kind;
 
 struct pil_cdevice {
   pil_dev_kind kind;
   pil_circuit *circuit;
-  pil_node n[3]; /* op-amp: + - out; bjt: C B E                        */
+  pil_node n[3]; /* op-amp: + - out;  bjt: C B E; mosfet: D G S         */
   double vsat;   /* op-amp rail                                         */
-  double beta;   /* bjt forward current gain                            */
+  double beta;   /* bjt forward current gain; mosfet transconductance K */
+  double vth;    /* mosfet threshold magnitude                          */
   double v1, v2; /* Linearisation: op-amp v+ - v-; bjt vbe, vbc (signed)*/
   double ti[3];  /* Current into each terminal after last step          */
   int branch;

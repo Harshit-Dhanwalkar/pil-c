@@ -131,6 +131,15 @@ pil_cdevice *pil_npn(pil_circuit *c, pil_node collector, pil_node base,
                      pil_node emitter, double beta, const char *label);
 pil_cdevice *pil_pnp(pil_circuit *c, pil_node collector, pil_node base,
                      pil_node emitter, double beta, const char *label);
+/* MOSFET, square-law (level 1) model with channel-length modulation 0.02 / V:
+ * I_D = K/2 (V_GS - V_th)^2 in saturation, K (V_ov V_DS - V_DS^2 / 2) in triode
+ * region, zero below threshold; no gate current (add capacitors as needed)
+ * vth is threshold magnitude for both polarities
+ * Terminals: 0 = drain, 1 = gate, 2 = source; draw with gate on left */
+pil_cdevice *pil_nmos(pil_circuit *c, pil_node drain, pil_node gate,
+                      pil_node source, double K, double vth, const char *label);
+pil_cdevice *pil_pmos(pil_circuit *c, pil_node drain, pil_node gate,
+                      pil_node source, double K, double vth, const char *label);
 /* Current flowing into terminal `term` (0..2, order as above) */
 double pil_cdevice_current(const pil_cdevice *d, int term);
 /* Voltage between two terminals: v(term a) - v(term b) */
