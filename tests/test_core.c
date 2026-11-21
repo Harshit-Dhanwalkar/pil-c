@@ -1818,6 +1818,47 @@ static void test_foucault(void) {
   check("plane angle at t=58.5 s equals -W t (mod pi)", psi, want, 0.03);
 }
 
+static void test_chaos(void) {
+  puts("driven pendulum: sensitive dependence on initial conditions");
+  double a[2] = {0.2, 0};
+  double b[2] = {0.2 + 1e-9, 0};
+  double T = 2 * 3.14159265358979 / (2.0 / 3.0), h = T / 600;
+  double d0 = 1e-9;
+  double d = 0;
+  double tm = 0;
+  for (int i = 0; i < 600 * 40; i++) {
+    for (int k = 0; k < 2; k++) {
+      double *s = k ? b : a;
+      double k1[2];
+      double k2[2];
+      double k3[2];
+      double k4[2];
+      double u[2];
+      double tt = tm;
+#define F(o, in, t)                                                            \
+  (o)[0] = (in)[1];                                                            \
+  (o)[1] = -(in)[1] / 2.0 - sin((in)[0]) + 1.5 * cos((2.0 / 3.0) * (t));
+      F(k1, s, tt)
+      u[0] = s[0] + 0.5 * h * k1[0];
+      u[1] = s[1] + 0.5 * h * k1[1];
+      F(k2, u, tt + 0.5 * h)
+      u[0] = s[0] + 0.5 * h * k2[0];
+      u[1] = s[1] + 0.5 * h * k2[1];
+      F(k3, u, tt + 0.5 * h)
+      u[0] = s[0] + h * k3[0];
+      u[1] = s[1] + h * k3[1];
+      F(k4, u, tt + h)
+#undef F
+      for (int j = 0; j < 2; j++) {
+        s[j] += h / 6 * (k1[j] + 2 * k2[j] + 2 * k3[j] + k4[j]);
+      }
+    }
+    tm += h;
+  }
+  d = fabs(a[0] - b[0]) + fabs(a[1] - b[1]);
+  check("separation grew by > 1e4 in 40 drive periods", d > 1e4 * d0, 1, 0);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1861,6 +1902,7 @@ int main(void) {
   test_boris();
   test_dipole();
   test_foucault();
+  test_chaos();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

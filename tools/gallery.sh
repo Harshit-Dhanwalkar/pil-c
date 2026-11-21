@@ -34,6 +34,7 @@ motor|5|DC motor driving a flywheel
 linkage|6|Parallelogram linkage with a rolling disc, slider and double pendulum
 loop|5|Loop-the-loop
 phase|14|Damped pendulum with a phase-portrait plot
+poincare|250|Driven damped pendulum: strobe points trace a strange attractor
 projectile|5|Projectile with and without drag: traces and vectors
 pulleys|6|Pulley system
 race|16|Rolling down an incline: hoop, disc, sphere and a frictionless slider
