@@ -1275,6 +1275,28 @@ static void test_bridge_rectifier(void) {
   pil_world_free(w);
 }
 
+static void test_resonance(void) {
+  puts("driven oscillator at resonance: amplitude F0 / (c w0)");
+  const double m = 1.0, k = 100.0, c = 2.0, F0 = 1.0, w0 = sqrt(k / m);
+  pil_world *w = pil_world_new();
+  pil_world_set_gravity(w, 0, 0);
+  pil_body *b = pil_add_body(w, &(pil_body_desc){.shape = pil_rect(0.5, 0.4),
+                                                 .mass = m, .pos = {0, 0}});
+  pil_add_prismatic(w, pil_on(b, 0, 0), pil_at(0, 0), (pil_vec2){1, 0});
+  pil_add_spring(w, pil_at(-1, 0), pil_on(b, 0, 0), k, 1.0);
+  pil_add_damper(w, pil_at(-1, 0), pil_on(b, 0, 0), c);
+  struct { pil_body *b; double F0, w; } d = {b, F0, w0};
+  pil_add_custom_force(w, res_push, &d);
+  pil_world_advance(w, 8.0, 5e-4);
+  double amp = 0;
+  for (int i = 0; i < 2000; i++) {
+    pil_world_advance(w, 1e-3, 5e-4);
+    if (fabs(b->pos.x) > amp) amp = fabs(b->pos.x);
+  }
+  check("resonant amplitude", amp, F0 / (c * w0), 5e-4);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1307,6 +1329,7 @@ int main(void) {
   test_bead_chain();
   test_roll_race();
   test_bridge_rectifier();
+  test_resonance();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

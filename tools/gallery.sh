@@ -33,6 +33,7 @@ phase|14|Damped pendulum with a phase-portrait plot
 projectile|5|Projectile with and without drag: traces and vectors
 pulleys|6|Pulley system
 race|16|Rolling down an incline: hoop, disc, sphere and a frictionless slider
+resonance|20|Swept-frequency drive: resonance curve of a damped oscillator
 ring|6|Ring of masses
 swing|8|Swinging Atwood machine with energy plot
 shaker|6|Shaker with a driven block, rolling disc and pendulum
@@ -43,8 +44,8 @@ bridge|10|Full-wave bridge rectifier with smoothing capacitor
 cyclotron|8|Charges in a magnetic field: circles and equal periods
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking
-rlc|5|Series RLC driven by an AC source
 rectifier|5|Half-wave rectifier
+rlc|5|Series RLC driven by an AC source
 '
 
 CARDS=
