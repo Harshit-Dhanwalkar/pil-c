@@ -62,7 +62,7 @@ void pil_view_fit_region(pil_view *v, double x0, double y0, double x1,
   double rh = (fy1 - fy0) * H;
 
   pil_view_fit(v, x0, y0, x1, y1, rw, rh, margin);
-  // box is centred in region; recentre view on whole canvas
+  // Box is centred in region; recentre view on whole canvas
   double rcx = (fx0 + fx1) * 0.5 * W;
   double rcy = (fy0 + fy1) * 0.5 * H;
 
@@ -144,8 +144,9 @@ static int utf8_encode(unsigned cp, char *o) {
 // Greek letters and script l are not in Latin Modern Roman: draw them from
 // maths font, mapped to Unicode "mathematical italic" block
 static int is_math_glyph(unsigned cp) {
-  return cp == 0x2113 || (cp >= 0x391 && cp <= 0x3a9) ||
-         (cp >= 0x3b1 && cp <= 0x3c9);
+  return cp == 0x2113 || cp == 0x2248 || cp == 0x2264 || cp == 0x2265 ||
+         cp == 0x2202 || cp == 0x2207 || cp == 0x221e ||
+         (cp >= 0x391 && cp <= 0x3a9) || (cp >= 0x3b1 && cp <= 0x3c9);
 }
 
 static unsigned math_italic(unsigned cp) {
@@ -194,7 +195,7 @@ static double text_piece(cairo_t *cr, const pil_style *st, const char *family,
   return ext.x_advance;
 }
 
-// one chunk (no _ or ^): splits into Latin runs and maths glyphs
+// One chunk (no _ or ^): splits into Latin runs and maths glyphs
 static double text_chunk(cairo_t *cr, const pil_style *st, const char *s, int n,
                          double x, double y, double size, int draw) {
   double x0 = x;
@@ -231,8 +232,82 @@ static double text_chunk(cairo_t *cr, const pil_style *st, const char *s, int n,
   return x - x0;
 }
 
+// LaTeX-style macros in labels: \omega, \Delta, \theta, \cdot ... expand to
+// the Unicode glyph before layout (so they also work inside _{...} and ^{...});
+// like TeX, one space after a macro name is swallowed
+// WARN: Unknown macros stay as typed
+static const struct {
+  const char *name;
+  unsigned cp;
+} macro_tab[] = {
+    {"alpha", 0x3b1},    {"beta", 0x3b2},    {"gamma", 0x3b3},
+    {"delta", 0x3b4},    {"epsilon", 0x3b5}, {"varepsilon", 0x3b5},
+    {"zeta", 0x3b6},     {"eta", 0x3b7},     {"theta", 0x3b8},
+    {"vartheta", 0x3b8}, {"iota", 0x3b9},    {"kappa", 0x3ba},
+    {"lambda", 0x3bb},   {"mu", 0x3bc},      {"nu", 0x3bd},
+    {"xi", 0x3be},       {"pi", 0x3c0},      {"rho", 0x3c1},
+    {"sigma", 0x3c3},    {"tau", 0x3c4},     {"upsilon", 0x3c5},
+    {"phi", 0x3c6},      {"varphi", 0x3c6},  {"chi", 0x3c7},
+    {"psi", 0x3c8},      {"omega", 0x3c9},   {"Gamma", 0x393},
+    {"Delta", 0x394},    {"Theta", 0x398},   {"Lambda", 0x39b},
+    {"Xi", 0x39e},       {"Pi", 0x3a0},      {"Sigma", 0x3a3},
+    {"Upsilon", 0x3a5},  {"Phi", 0x3a6},     {"Psi", 0x3a8},
+    {"Omega", 0x3a9},    {"ell", 0x2113},    {"cdot", 0xb7},
+    {"times", 0xd7},     {"pm", 0xb1},       {"deg", 0xb0},
+    {"degree", 0xb0},    {"approx", 0x2248}, {"le", 0x2264},
+    {"ge", 0x2265},      {"infty", 0x221e},  {"partial", 0x2202},
+    {"nabla", 0x2207},   {"to", 0x2192},     {"hbar", 0x127},
+};
+
+static void expand_macros(const char *s, char *out, size_t cap) {
+  size_t o = 0;
+  while (*s && o + 5 < cap) {
+    if (*s != '\\') {
+      out[o++] = *s++;
+      continue;
+    }
+
+    const char *a = s + 1;
+    size_t n = 0;
+    while ((a[n] >= 'a' && a[n] <= 'z') || (a[n] >= 'A' && a[n] <= 'Z')) {
+      n++;
+    }
+
+    int hit = 0;
+    for (size_t k = 0; k < sizeof macro_tab / sizeof *macro_tab; k++) {
+      if (strlen(macro_tab[k].name) == n && !strncmp(macro_tab[k].name, a, n)) {
+        o += (size_t)utf8_encode(macro_tab[k].cp, out + o);
+        s = a + n;
+        if (*s == ' ') {
+          s++;
+        }
+
+        hit = 1;
+        break;
+      }
+    }
+
+    if (!hit) {
+      out[o++] = *s++;
+    }
+  }
+
+  out[o] = 0;
+}
+
+static double text_run_raw(cairo_t *cr, const pil_style *st, const char *s,
+                           double x, double y, int draw);
+
 static double text_run(cairo_t *cr, const pil_style *st, const char *s,
                        double x, double y, int draw) {
+  char buf[512];
+  expand_macros(s, buf, sizeof buf);
+
+  return text_run_raw(cr, st, buf, x, y, draw);
+}
+
+static double text_run_raw(cairo_t *cr, const pil_style *st, const char *s,
+                           double x, double y, int draw) {
   double x0 = x;
   double fs = st->font_px;
   while (*s) {
@@ -695,7 +770,7 @@ static void draw_joint_marks(cairo_t *cr, const pil_element *e,
     pil_draw_hinge(cr, S(v, pil_anchor_world(e->a)), st);
     pil_draw_hinge(cr, S(v, pil_anchor_world(e->b)), st);
   } else if (e->kind == EL_SPRING || e->kind == EL_DAMPER) {
-    // small pin at attachment points, as in the figures
+    // Small pin at attachment points, as in the figures
     if (e->a.body) {
       pil_draw_hinge(cr, S(v, pil_anchor_world(e->a)), st);
     }
@@ -818,7 +893,7 @@ static void draw_vector(cairo_t *cr, const pil_deco *d, const pil_view *v,
 }
 
 // Annotations
-static void draw_deco(cairo_t *cr, const pil_world *w, const pil_deco *d, 
+static void draw_deco(cairo_t *cr, const pil_world *w, const pil_deco *d,
                       const pil_view *v, const pil_style *st) {
   if (d->hidden) {
     return;

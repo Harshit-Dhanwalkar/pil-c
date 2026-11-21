@@ -385,7 +385,10 @@ pil_element *pil_add_terrain_contact(pil_world *w, pil_terrain *t,
                                      double c);
 
 /* Annotations: purely visual */
-/* Text supports  x_1  x_{12}  x^2  and UTF-8 (e.g. "\xcf\x86" for \phi) */
+/* Text supports  x_1  x_{12}  x^2  and UTF-8 (e.g. "\xcf\x86" for \phi), and
+ * LaTeX-style macros written in C as "\\omega", "\\Delta", "\\theta_{max}":
+ * all Greek letters, \\ell \\cdot \\times \\pm \\deg \\approx \\le \\ge \\infty
+ * \\partial \\nabla \\to \\hbar. Labels hold up to 95 bytes */
 pil_deco *pil_add_label(pil_world *w, pil_anchor at, const char *text,
                         double dx_px, double dy_px);
 /* Live text label: callback updates string every frame */

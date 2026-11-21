@@ -1334,6 +1334,181 @@ static void test_resonance(void) {
   pil_world_free(w);
 }
 
+static void test_devices(void) {
+  puts("transformer, op-amp, bjt, zener");
+  // Transformer, turns ratio 2, loaded
+  {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node p1 = pil_circuit_node(c, 0, 1), g = pil_circuit_node(c, 0, 0),
+             s1 = pil_circuit_node(c, 3, 1);
+    pil_circuit_ground(c, g);
+    pil_vsource_ac(c, p1, g, 10.0, 1000.0, 0.0, "v");
+    pil_celement *l1 = pil_inductor(c, p1, g, 1.0, 0.0, "L1");
+    pil_celement *l2 = pil_inductor(c, s1, g, 4.0, 0.0, "L2");
+    pil_celement *rl = pil_resistor(c, s1, g, 5e3, "R");
+    pil_mutual(l1, l2, 0.999);
+    pil_circuit_set_step(c, 1e-6);
+    pil_world_advance(w, 5e-3, 1e-5);
+    double pk = 0;
+    for (int i = 0; i < 1000; i++) {
+      pil_world_advance(w, 1e-6, 1e-5);
+      double v = fabs(pil_celement_voltage(rl));
+      if (v > pk)
+        pk = v;
+    }
+    check("transformer secondary peak (n = 2)", pk, 20.0, 0.6);
+    pil_world_free(w);
+  }
+  // Inverting op-amp: gain -Rf/Rin, saturates at the rail
+  for (int k = 0; k < 2; k++) {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node in = pil_circuit_node(c, 0, 1), sum = pil_circuit_node(c, 1, 1),
+             out = pil_circuit_node(c, 3, 1), g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_dc(c, in, g, k ? 2.0 : 1.0, "v");
+    pil_resistor(c, in, sum, 1e3, "Rin");
+    pil_resistor(c, sum, out, 10e3, "Rf");
+    pil_opamp(c, g, sum, out, 12.0, "A");
+    pil_world_advance(w, 1e-3, 1e-4);
+    check(k ? "op-amp saturates at -12 V" : "inverting gain -10",
+          pil_circuit_node_voltage(c, out), k ? -12.0 : -10.0, 2e-3);
+    pil_world_free(w);
+  }
+  // npn common emitter: active (Ic = beta Ib) and saturated
+  for (int k = 0; k < 2; k++) {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node vcc = pil_circuit_node(c, 0, 3), col = pil_circuit_node(c, 2, 2),
+             bas = pil_circuit_node(c, 1, 1), em = pil_circuit_node(c, 2, 0),
+             vb = pil_circuit_node(c, 0, 1), g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_dc(c, vcc, g, 10.0, "Vcc");
+    pil_vsource_dc(c, vb, g, 5.0, "Vb");
+    pil_resistor(c, vcc, col, 1e3, "Rc");
+    pil_resistor(c, vb, bas, k ? 10e3 : 430e3, "Rb");
+    pil_wire(c, em, g);
+    pil_cdevice *q = pil_npn(c, col, bas, em, 100.0, "Q");
+    pil_world_advance(w, 1e-3, 1e-4);
+    if (!k) {
+      check("npn Ic / Ib = beta",
+            pil_cdevice_current(q, 0) / pil_cdevice_current(q, 1), 100.0, 5.0);
+      check("npn active Vce", pil_cdevice_voltage(q, 0, 2), 9.0, 0.2);
+    } else {
+      check("npn saturated Vce < 0.3 V", pil_cdevice_voltage(q, 0, 2) < 0.3, 1,
+            0);
+    }
+
+    check("KCL at base", pil_circuit_node_current_sum(c, bas), 0.0, 1e-9);
+    pil_world_free(w);
+  }
+  // Zener shunt regulator
+  for (int k = 0; k < 2; k++) {
+    pil_world *w = pil_world_new();
+    pil_circuit *c = pil_add_circuit(w);
+    pil_node a = pil_circuit_node(c, 0, 2), z = pil_circuit_node(c, 2, 2),
+             g = pil_circuit_node(c, 0, 0);
+    pil_circuit_ground(c, g);
+    pil_vsource_dc(c, a, g, k ? 15.0 : 12.0, "V");
+    pil_resistor(c, a, z, 470.0, "Rs");
+    pil_zener(c, g, z, 5.1, "Z");
+    pil_resistor(c, z, g, 2e3, "RL");
+    pil_world_advance(w, 1e-3, 1e-4);
+    double vz = pil_circuit_node_voltage(c, z);
+    check(k ? "zener holds at 15 V input" : "zener holds at 12 V input", vz,
+          5.25, 0.2);
+    pil_world_free(w);
+  }
+}
+
+typedef struct {
+  double m;
+  double R;
+  double Om;
+  double g;
+} hoop_t;
+static double hoop_T_(const double *q, const double *qd, void *u) {
+  const hoop_t *p = u;
+  double s = sin(q[0]);
+  return 0.5 * p->m * p->R * p->R * (qd[0] * qd[0] + p->Om * p->Om * s * s);
+}
+static double hoop_V_(const double *q, void *u) {
+  const hoop_t *p = u;
+  return -p->m * p->g * p->R * cos(q[0]);
+}
+
+static void test_hoop(void) {
+  puts("bead on rotating hoop: equilibrium, small-oscillation frequency, "
+       "Jacobi integral");
+  hoop_t p = {1.0, 1.0, 5.0, 9.81};
+  double th0 = acos(p.g / (p.R * p.Om * p.Om));
+  pil_world *w = pil_world_new();
+  pil_lsys *s = pil_add_lagrangian(w, 1, hoop_T_, hoop_V_, &p);
+  pil_lsys_set_state(s, (double[]){th0 + 0.01}, (double[]){0});
+  double h0 = pil_lsys_jacobi(s);
+  // Timing first return to start: period 2 pi / (Om sin th0)
+  double per = 2.0 * 3.14159265358979 / (p.Om * sin(th0));
+  double tprev = 0;
+  double tcross = 0;
+  double qprev = pil_lsys_q(s)[0] - th0;
+  int up = 0;
+  for (int i = 0; i < 4000 && tcross == 0; i++) {
+    pil_world_advance(w, 1e-3, 1e-4);
+    double qn = pil_lsys_q(s)[0] - th0;
+    if (qprev > 0 && qn <= 0) {
+      if (up) {
+        tcross = pil_world_time(w);
+      } else {
+        tprev = pil_world_time(w);
+        up = 1;
+      }
+    }
+    qprev = qn;
+  }
+  (void)tprev;
+  check("equilibrium angle (g / R Om^2)", cos(th0), p.g / (p.R * p.Om * p.Om),
+        1e-12);
+  check("small-oscillation period", tcross - tprev, per, 2e-3);
+  check("Jacobi integral conserved", pil_lsys_jacobi(s) - h0, 0.0, 1e-6);
+  pil_world_free(w);
+}
+
+static double dp_T_(const double *q, const double *qd, void *u) {
+  (void)u;
+  return 0.5 * 2.0 * qd[0] * qd[0] + 0.5 * qd[1] * qd[1] +
+         qd[0] * qd[1] * cos(q[0] - q[1]);
+}
+static double dp_V_(const double *q, void *u) {
+  (void)u;
+  return -2.0 * 9.81 * cos(q[0]) - 9.81 * cos(q[1]);
+}
+
+static void test_double_pendulum(void) {
+  puts("double pendulum: energy conservation, small-angle normal modes");
+  pil_world *w = pil_world_new();
+  pil_lsys *s = pil_add_lagrangian(w, 2, dp_T_, dp_V_, NULL);
+  pil_lsys_set_state(s, (double[]){2.0, 2.2}, (double[]){0, 0});
+  double E0 = pil_lsys_jacobi(s);
+  pil_world_advance(w, 10.0, 5e-4);
+  check("energy drift over 10 s", pil_lsys_jacobi(s) - E0, 0.0, 1e-6);
+  pil_world_free(w);
+  // m1 = m2 = l1 = l2 = 1: slow normal mode has w^2 = (2 - sqrt 2) g and
+  // theta_2 / theta_1 = sqrt 2; after one period the start state returns
+  w = pil_world_new();
+  s = pil_add_lagrangian(w, 2, dp_T_, dp_V_, NULL);
+  double a = 1e-3;
+  double r = sqrt(2.0);
+  pil_lsys_set_state(s, (double[]){a, a * r}, (double[]){0, 0});
+  double T = 2.0 * 3.14159265358979 / sqrt((2.0 - r) * 9.81);
+  pil_world_advance(w, T, 2e-4);
+  check("slow mode returns after one period (theta_1 / a)",
+        pil_lsys_q(s)[0] / a, 1.0, 2e-3);
+  check("slow mode keeps theta_2 / theta_1 = sqrt 2",
+        pil_lsys_q(s)[1] / pil_lsys_q(s)[0], r, 2e-3);
+  pil_world_free(w);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -1367,6 +1542,9 @@ int main(void) {
   test_roll_race();
   test_bridge_rectifier();
   test_resonance();
+  test_devices();
+  test_hoop();
+  test_double_pendulum();
   test_kirchhoff();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");

@@ -102,6 +102,41 @@ pil_celement *pil_voice_coil(pil_circuit *c, pil_node a, pil_node b,
                              pil_body *mover, pil_body *base, pil_vec2 axis,
                              double kf, double r, double l, const char *label);
 
+/* Zener diode: a diode that also conducts in reverse above vz volts (sharp
+ * knee, about 1 mA at v = -vz) */
+pil_celement *pil_zener(pil_circuit *c, pil_node anode, pil_node cathode,
+                        double vz, const char *label);
+
+/* Transformer: couple two inductors with coefficient k (|k| <= 1, mutual
+ * inductance M = k sqrt(L1 L2)); both currents counted into dotted end (node
+ * a of each)
+ * Drawn with a core between windings. k near 1 with L2 / L1 = n^2 gives an
+ * iron-core transformer of turns ratio n */
+void pil_mutual(pil_celement *l1, pil_celement *l2, double k);
+
+/* Three-terminal devices */
+typedef struct pil_cdevice pil_cdevice;
+/* Op-amp: output follows vsat tanh(gain (v+ - v-) / vsat) referred to ground
+ * with gain 1e5, so negative feedback gives virtual short and saturation is at
+ * +-vsat
+ * Terminals: 0 = non-inverting in, 1 = inverting in, 2 = out
+ * Place both inputs at same x, left of output, for symbol to draw properly */
+pil_cdevice *pil_opamp(pil_circuit *c, pil_node plus, pil_node minus,
+                       pil_node out, double vsat, const char *label);
+/* Bipolar transistor (Ebers-Moll, Is = 1e-14 A, Vt = 26 mV, beta_R = 2).
+ * Terminals: 0 = collector, 1 = base, 2 = emitter
+ * Put collector above and emitter below, base on left, for symbol to draw
+ * properly */
+pil_cdevice *pil_npn(pil_circuit *c, pil_node collector, pil_node base,
+                     pil_node emitter, double beta, const char *label);
+pil_cdevice *pil_pnp(pil_circuit *c, pil_node collector, pil_node base,
+                     pil_node emitter, double beta, const char *label);
+/* Current flowing into terminal `term` (0..2, order as above) */
+double pil_cdevice_current(const pil_cdevice *d, int term);
+/* Voltage between two terminals: v(term a) - v(term b) */
+double pil_cdevice_voltage(const pil_cdevice *d, int a, int b);
+void pil_cdevice_set_label_at(pil_cdevice *d, double dx_px, double dy_px);
+
 /* Placement of label: pixel offset from symbol centre (dy up) */
 void pil_celement_set_label_at(pil_celement *e, double dx_px, double dy_px);
 /* Do not draw this element (or its symbol; its wires stay) */

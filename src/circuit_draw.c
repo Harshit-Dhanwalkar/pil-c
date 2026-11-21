@@ -169,6 +169,11 @@ static void symbol(cairo_t *cr, const pil_celement *e, double len,
     cairo_stroke(cr);
     cairo_set_line_width(cr, st->line_w * 1.5);
     line(cr, tip, -w, tip, w);
+    if (e->vz > 0) { // Zener: bent ends on cathode bar
+      cairo_set_line_width(cr, st->line_w * 1.5);
+      line(cr, tip, -w, tip + 4, -w - 3);
+      line(cr, tip, w, tip - 4, w + 3);
+    }
 
     break;
   }
@@ -296,6 +301,89 @@ static void draw_ground(cairo_t *cr, pil_vec2 p, const pil_style *st) {
   line(cr, p.x - 4, p.y + 20, p.x + 4, p.y + 20);
 }
 
+static void plus_sign(cairo_t *cr, double x, double y, int plus) {
+  line(cr, x - 4, y, x + 4, y);
+  if (plus) {
+    line(cr, x, y - 4, x, y + 4);
+  }
+}
+
+static void arrow_head(cairo_t *cr, double x, double y, double ux, double uy) {
+  cairo_move_to(cr, x, y);
+  cairo_line_to(cr, x - ux * 8 - uy * 4, y - uy * 8 + ux * 4);
+  cairo_line_to(cr, x - ux * 8 + uy * 4, y - uy * 8 - ux * 4);
+  cairo_close_path(cr);
+  cairo_fill(cr);
+}
+
+// Op-amp triangle and transistor symbol, drawn between their terminal nodes
+static void draw_device(cairo_t *cr, const pil_circuit *c, const pil_view *v,
+                        const pil_cdevice *d, const pil_style *st) {
+  pil_vec2 P0 = node_px(c, v, d->n[0]);
+  pil_vec2 P1 = node_px(c, v, d->n[1]);
+  pil_vec2 P2 = node_px(c, v, d->n[2]);
+  cairo_set_line_width(cr, st->line_w);
+  double lx, ly; // label anchor
+
+  if (d->kind == DEV_OPAMP) {
+    double yc = 0.5 * (P0.y + P1.y);
+    double xl = 0.5 * (P0.x + P1.x) + 14;
+    double H = 0.5 * fabs(P0.y - P1.y) + 16;
+    double xo = P2.x - 6;
+    if (xo < xl + 30) {
+      xo = P2.x;
+    }
+
+    line(cr, P0.x, P0.y, xl, P0.y);
+    line(cr, P1.x, P1.y, xl, P1.y);
+    line(cr, xo, yc, P2.x, P2.y);
+    cairo_move_to(cr, xl, yc - H);
+    cairo_line_to(cr, xl, yc + H);
+    cairo_line_to(cr, xo, yc);
+    cairo_close_path(cr);
+    cairo_stroke(cr);
+    plus_sign(cr, xl + 8, P0.y, 1);
+    plus_sign(cr, xl + 8, P1.y, 0);
+    lx = 0.5 * (xl + xo) - 6;
+    ly = yc + H + 12;
+  } else {
+    double ym = 0.5 * (P0.y + P2.y);
+    double h = 0.5 * fabs(P2.y - P0.y);
+    double sg = P2.y > P0.y ? 1.0 : -1.0;
+    double xc = P0.x;
+    double xb = xc - 14;
+    pil_vec2 Sc = {xc, ym - sg * 0.55 * h}, Se = {xc, ym + sg * 0.55 * h};
+    pil_vec2 Bc = {xb, ym - sg * 0.22 * h}, Be = {xb, ym + sg * 0.22 * h};
+
+    line(cr, P1.x, P1.y, xb, ym);
+    cairo_set_line_width(cr, st->line_w * 2.2);
+    line(cr, xb, ym - 0.42 * h, xb, ym + 0.42 * h);
+    cairo_set_line_width(cr, st->line_w);
+    line(cr, P0.x, P0.y, Sc.x, Sc.y);
+    line(cr, Sc.x, Sc.y, Bc.x, Bc.y);
+    line(cr, P2.x, P2.y, Se.x, Se.y);
+    line(cr, Se.x, Se.y, Be.x, Be.y);
+
+    // Emitter arrow: out of device for npn, into it for pnp
+    double ex = Se.x - Be.x, ey = Se.y - Be.y, el = hypot(ex, ey);
+    ex /= el;
+    ey /= el;
+    if (d->kind == DEV_NPN) {
+      arrow_head(cr, Be.x + ex * el * 0.78, Be.y + ey * el * 0.78, ex, ey);
+    } else {
+      arrow_head(cr, Be.x + ex * el * 0.28, Be.y + ey * el * 0.28, -ex, -ey);
+    }
+
+    lx = xc + 12;
+    ly = ym;
+  }
+
+  if (d->label[0]) {
+    pil_draw_text(cr, pil_v2(lx + d->label_dx, ly - d->label_dy), d->label,
+                  d->kind == DEV_OPAMP ? 0.5 : 0.0, st);
+  }
+}
+
 void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
                       const pil_style *st) {
   cairo_save(cr);
@@ -350,6 +438,16 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
       cairo_save(cr);
       cairo_translate(cr, m.x, m.y);
       cairo_rotate(cr, atan2(uy, ux));
+      if (e->kind == CE_INDUCTOR && e->mate) {
+        // Coils of coupled windings bulge towards the core
+        pil_vec2 fm = {
+            0.5 * (node_px(c, v, e->mate->a).x + node_px(c, v, e->mate->b).x),
+            0.5 * (node_px(c, v, e->mate->a).y + node_px(c, v, e->mate->b).y)};
+        if ((fm.x - m.x) * uy - (fm.y - m.y) * ux > 0) {
+          cairo_scale(cr, 1, -1);
+        }
+      }
+
       symbol(cr, e, sl, st, c->world->t);
       cairo_restore(cr);
     }
@@ -376,6 +474,56 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     }
   }
 
+  // Transformer cores and dots
+  for (int k = 0; k < c->ne; k++) {
+    const pil_celement *e = c->els[k];
+    if (e->kind != CE_INDUCTOR || !e->mate) {
+      continue;
+    }
+
+    const pil_celement *f = e->mate;
+    pil_vec2 a = node_px(c, v, e->a), b = node_px(c, v, e->b);
+    pil_vec2 fa = node_px(c, v, f->a), fb = node_px(c, v, f->b);
+    double L = hypot(b.x - a.x, b.y - a.y);
+    if (L < 1e-6) {
+      continue;
+    }
+
+    double ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+    pil_vec2 m = {0.5 * (a.x + b.x), 0.5 * (a.y + b.y)};
+    pil_vec2 mf = {0.5 * (fa.x + fb.x), 0.5 * (fa.y + fb.y)};
+    double sl = fmin(symbol_length(e), 0.8 * L);
+    double nx = -uy, ny = ux; // Perpendicular, towards the core
+    double side = (mf.x - m.x) * nx + (mf.y - m.y) * ny;
+    if (side < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+
+    if (e < f) {
+      pil_vec2 cc = {0.5 * (m.x + mf.x), 0.5 * (m.y + mf.y)};
+      for (int j = -1; j <= 1; j += 2) {
+        line(cr, cc.x - ux * sl * 0.5 + nx * 2.5 * j,
+             cc.y - uy * sl * 0.5 + ny * 2.5 * j,
+             cc.x + ux * sl * 0.5 + nx * 2.5 * j,
+             cc.y + uy * sl * 0.5 + ny * 2.5 * j);
+      }
+    }
+
+    // dot at the start (node a) end, on the core side
+    pil_vec2 dp = {m.x - ux * sl * 0.5 + nx * 9, m.y - uy * sl * 0.5 + ny * 9};
+    cairo_arc(cr, dp.x, dp.y, 2.6, 0, 2 * M_PI);
+    cairo_fill(cr);
+  }
+
+  for (int k = 0; k < c->nd; k++) {
+    for (int t = 0; t < 3; t++) {
+      deg[c->devs[k]->n[t]]++;
+    }
+
+    draw_device(cr, c, v, c->devs[k], st);
+  }
+
   for (int n = 0; n < c->nn; n++) {
     if (deg[n] >= 3) {
       pil_vec2 p = node_px(c, v, n);
@@ -384,14 +532,21 @@ void pil_circuit_draw(cairo_t *cr, const pil_circuit *c, const pil_view *v,
     }
   }
 
-  // node voltages at joints, once circuit is running. One label per electrical
-  // node (wires merge nodes) where at least two elements meet
+  // Node voltages at joints, once circuit is running
+  // One label per electrical node (wires merge nodes) where at least two
+  // elements meet
   if (st->show_voltages && c->peak_i > 1e-12 && c->vn) {
     int *terms = calloc((size_t)c->nn, sizeof *terms);
     if (terms) {
       for (int k = 0; k < c->ne; k++) {
         terms[pil_cnode_find((pil_circuit *)c, c->els[k]->a)]++;
         terms[pil_cnode_find((pil_circuit *)c, c->els[k]->b)]++;
+      }
+
+      for (int k = 0; k < c->nd; k++) {
+        for (int t = 0; t < 3; t++) {
+          terms[pil_cnode_find((pil_circuit *)c, c->devs[k]->n[t])]++;
+        }
       }
 
       int gr =

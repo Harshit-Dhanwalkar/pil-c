@@ -100,7 +100,7 @@ struct pil_deco {
   int hidden;
   int reverse;
   pil_body *body;
-  char text[48];
+  char text[96];
   pil_live_label_fn lfn;
   void *luser;
   /* trace: sampled path; vector: kind and scale */

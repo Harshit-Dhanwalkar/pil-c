@@ -22,6 +22,12 @@
 #define GMIN 1e-12
 #define R_ON 1e-3
 #define R_OFF 1e9
+#define OA_GAIN 1e5
+#define BJT_IS 1e-14
+#define BJT_VT 0.026
+#define BJT_BR 2.0
+#define ZENER_IK 1e-3 // Reverse current at knee
+#define ZENER_N 0.05  // Reverse knee sharpness [V]
 
 static void *grow(void *p, int n, int *cap, size_t sz) {
   if (n > *cap) {
@@ -192,6 +198,91 @@ pil_celement *pil_switch(pil_circuit *c, pil_node a, pil_node b,
   return e;
 }
 
+pil_celement *pil_zener(pil_circuit *c, pil_node anode, pil_node cathode,
+                        double vz, const char *label) {
+  pil_celement *e = pil_diode(c, anode, cathode, 1e-12, 0.04, label);
+  e->vz = vz;
+
+  return e;
+}
+
+void pil_mutual(pil_celement *l1, pil_celement *l2, double k) {
+  if (!l1 || !l2 || l1->kind != CE_INDUCTOR || l2->kind != CE_INDUCTOR) {
+    return;
+  }
+
+  double m = k * sqrt(l1->value * l2->value);
+  l1->mate = l2;
+  l2->mate = l1;
+  l1->mutual = m;
+  l2->mutual = m;
+}
+
+static pil_cdevice *new_dev(pil_circuit *c, pil_dev_kind k, pil_node n0,
+                            pil_node n1, pil_node n2, const char *label) {
+  pil_cdevice *d = calloc(1, sizeof *d);
+  if (!d) {
+    abort();
+  }
+
+  d->kind = k;
+  d->circuit = c;
+  d->n[0] = n0;
+  d->n[1] = n1;
+  d->n[2] = n2;
+  d->branch = -1;
+  if (label) {
+    snprintf(d->label, sizeof d->label, "%s", label);
+  }
+
+  c->devs = grow(c->devs, c->nd + 1, &c->dcap, sizeof *c->devs);
+  c->devs[c->nd++] = d;
+
+  return d;
+}
+
+pil_cdevice *pil_opamp(pil_circuit *c, pil_node plus, pil_node minus,
+                       pil_node out, double vsat, const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_OPAMP, plus, minus, out, label);
+  d->vsat = vsat;
+
+  return d;
+}
+
+pil_cdevice *pil_npn(pil_circuit *c, pil_node collector, pil_node base,
+                     pil_node emitter, double beta, const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_NPN, collector, base, emitter, label);
+  d->beta = beta;
+
+  return d;
+}
+
+pil_cdevice *pil_pnp(pil_circuit *c, pil_node collector, pil_node base,
+                     pil_node emitter, double beta, const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_PNP, collector, base, emitter, label);
+  d->beta = beta;
+
+  return d;
+}
+
+double pil_cdevice_current(const pil_cdevice *d, int term) {
+  return term >= 0 && term < 3 ? d->ti[term] : 0.0;
+}
+
+double pil_cdevice_voltage(const pil_cdevice *d, int a, int b) {
+  const pil_circuit *c = d->circuit;
+  if (!c->vn || a < 0 || a > 2 || b < 0 || b > 2) {
+    return 0.0;
+  }
+
+  return c->vn[d->n[a]] - c->vn[d->n[b]];
+}
+
+void pil_cdevice_set_label_at(pil_cdevice *d, double dx_px, double dy_px) {
+  d->label_dx = dx_px;
+  d->label_dy = dy_px;
+}
+
 static pil_celement *transducer(pil_circuit *c, pil_ce_kind k, pil_node a,
                                 pil_node b, pil_body *m, pil_body *m2,
                                 double kc, double r, double l,
@@ -257,6 +348,14 @@ double pil_circuit_node_current_sum(const pil_circuit *c, pil_node n) {
     }
   }
 
+  for (int k = 0; k < c->nd; k++) {
+    for (int t = 0; t < 3; t++) {
+      if (pil_cnode_find((pil_circuit *)c, c->devs[k]->n[t]) == r) {
+        sum += c->devs[k]->ti[t];
+      }
+    }
+  }
+
   return sum;
 }
 
@@ -269,6 +368,9 @@ double pil_circuit_energy(const pil_circuit *c) {
     } else if (e->kind == CE_INDUCTOR || e->kind == CE_MOTOR ||
                e->kind == CE_VCOIL) {
       E += 0.5 * e->value * e->i * e->i;
+      if (e->kind == CE_INDUCTOR && e->mate && e < e->mate) {
+        E += e->mutual * e->i * e->mate->i;
+      }
     }
   }
 
@@ -394,6 +496,12 @@ static void compute_wire_currents(pil_circuit *c) {
     ext[e->b] -= e->i;
   }
 
+  for (int k = 0; k < c->nd; k++) {
+    for (int t = 0; t < 3; t++) {
+      ext[c->devs[k]->n[t]] += c->devs[k]->ti[t];
+    }
+  }
+
   for (int start = 0; start < nn; start++) {
     if (seen[start]) {
       continue;
@@ -483,6 +591,10 @@ static int step_once(pil_circuit *c, double h) {
     }
   }
 
+  for (int k = 0; k < c->nd; k++) {
+    c->devs[k]->branch = c->devs[k]->kind == DEV_OPAMP ? nv + nb++ : -1;
+  }
+
   int N = nv + nb;
   if (N > c->scap) {
     c->scap = N * 2;
@@ -499,8 +611,12 @@ static int step_once(pil_circuit *c, double h) {
   for (int k = 0; k < c->ne; k++) {
     if (c->els[k]->kind == CE_DIODE) {
       has_diode = 1;
-      c->els[k]->vd = c->els[k]->v; // start from last accepted voltage
+      c->els[k]->vd = c->els[k]->v; // Start from last accepted voltage
     }
+  }
+
+  if (c->nd > 0) {
+    has_diode = 1; // op-amps and transistors are solved by Newton as well
   }
 
 #define IA(e) (idx[pil_cnode_find(c, (e)->a)])
@@ -546,6 +662,12 @@ static int step_once(pil_circuit *c, double h) {
         double ex = exp(fmin(vd_c / e->n_vt, 80.0));
         double id = e->is * (ex - 1.0);
         G = e->is * ex / e->n_vt + GMIN;
+        if (e->vz > 0) {
+          double ez = exp(fmin((-vd_c - e->vz) / ZENER_N, 80.0));
+          id -= ZENER_IK * ez;
+          G += ZENER_IK * ez / ZENER_N;
+        }
+
         if (G > 1e6) {
           G = 1e6;
         }
@@ -570,6 +692,16 @@ static int step_once(pil_circuit *c, double h) {
 
         AT(e->branch, e->branch) -= Rq;
         rhs[e->branch] = -Rq * e->i - carry * e->v;
+        if (e->mate) {
+          double Mq = e->mutual / (th * h);
+          AT(e->branch, e->mate->branch) -= Mq;
+          rhs[e->branch] -= Mq * e->mate->i;
+        }
+        if (e->mate) {
+          double Mq = e->mutual / (th * h);
+          AT(e->branch, e->mate->branch) -= Mq;
+          rhs[e->branch] -= Mq * e->mate->i;
+        }
         continue;
       }
       case CE_MOTOR:
@@ -625,8 +757,78 @@ static int step_once(pil_circuit *c, double h) {
       }
     }
 
+#define DI(d, t) (idx[pil_cnode_find(c, (d)->n[t])])
+    for (int k = 0; k < c->nd; k++) {
+      pil_cdevice *d = c->devs[k];
+      int i0 = DI(d, 0), i1 = DI(d, 1), i2 = DI(d, 2);
+      if (d->kind == DEV_OPAMP) {
+        double x = OA_GAIN * d->v1 / d->vsat, f, g;
+        if (fabs(x) > 30.0) {
+          f = x > 0 ? d->vsat : -d->vsat;
+          g = 0.0;
+        } else {
+          double th_ = tanh(x);
+          f = d->vsat * th_;
+          g = OA_GAIN * (1.0 - th_ * th_);
+        }
+
+        int br = d->branch;
+        if (i2 >= 0) {
+          AT(i2, br) += 1;
+          AT(br, i2) += 1;
+        }
+
+        if (i0 >= 0) {
+          AT(br, i0) -= g;
+        }
+
+        if (i1 >= 0) {
+          AT(br, i1) += g;
+        }
+
+        rhs[br] = f - g * d->v1;
+      } else {
+        // Ebers-Moll in the sign convention of an npn (s = -1 mirrors a pnp);
+        // current into a terminal is  k + a (vB - vE) + b (vB - vC)
+        const double sg = d->kind == DEV_NPN ? 1.0 : -1.0;
+        double eF = exp(fmin(d->v1 / BJT_VT, 80.0));
+        double eR = exp(fmin(d->v2 / BJT_VT, 80.0));
+        double iF = BJT_IS * (eF - 1.0), iR = BJT_IS * (eR - 1.0);
+        double gF = BJT_IS * eF / BJT_VT, gR = BJT_IS * eR / BJT_VT;
+        double aC = gF, bC = -gR * (1.0 + 1.0 / BJT_BR);
+        double aB = gF / d->beta, bB = gR / BJT_BR;
+        double I0C = iF - iR * (1.0 + 1.0 / BJT_BR);
+        double I0B = iF / d->beta + iR / BJT_BR;
+        double kC = sg * I0C - sg * (aC * d->v1 + bC * d->v2);
+        double kB = sg * I0B - sg * (aB * d->v1 + bB * d->v2);
+        double rowa[3] = {aC, aB, -(aC + aB)};
+        double rowb[3] = {bC, bB, -(bC + bB)};
+        double rowk[3] = {kC, kB, -(kC + kB)};
+        int ix[3] = {i0, i1, i2};
+        for (int r = 0; r < 3; r++) {
+          if (ix[r] < 0) {
+            continue;
+          }
+
+          if (i1 >= 0) {
+            AT(ix[r], i1) += rowa[r] + rowb[r];
+          }
+
+          if (i2 >= 0) {
+            AT(ix[r], i2) -= rowa[r];
+          }
+
+          if (i0 >= 0) {
+            AT(ix[r], i0) -= rowb[r];
+          }
+
+          rhs[ix[r]] -= rowk[r];
+        }
+      }
+    }
+
     if (!solve_dense(A, rhs, N)) {
-      newton_ok = 0; // singular: keep previous state
+      newton_ok = 0; // Singular: keep previous state
       break;
     }
 
@@ -642,7 +844,8 @@ static int step_once(pil_circuit *c, double h) {
         continue;
       }
 
-      int ia = IA(e), ib = IB(e);
+      int ia = IA(e);
+      int ib = IB(e);
       double vsol = (ia >= 0 ? rhs[ia] : 0.0) - (ib >= 0 ? rhs[ib] : 0.0);
       double vcrit = e->n_vt * log(e->n_vt / (1.41421356 * e->is));
       double vn = limit_diode(vsol, e->vd, e->n_vt, vcrit);
@@ -650,7 +853,37 @@ static int step_once(pil_circuit *c, double h) {
         converged = 0;
       }
 
+      if (e->vz > 0 && vn < e->vd - 3.0) {
+        vn = e->vd - 3.0; // Walk into breakdown in bounded steps
+      }
+
       e->vd = vn;
+    }
+
+    for (int k = 0; k < c->nd; k++) {
+      pil_cdevice *d = c->devs[k];
+      double v0 = DI(d, 0) >= 0 ? rhs[DI(d, 0)] : 0.0;
+      double v1 = DI(d, 1) >= 0 ? rhs[DI(d, 1)] : 0.0;
+      double v2 = DI(d, 2) >= 0 ? rhs[DI(d, 2)] : 0.0;
+      if (d->kind == DEV_OPAMP) {
+        double vs = v0 - v1;
+        if (fabs(vs - d->v1) > 1e-9 + 1e-6 * fabs(vs)) {
+          converged = 0;
+        }
+
+        d->v1 = iter > 20 ? 0.5 * (d->v1 + vs) : vs;
+      } else {
+        const double sg = d->kind == DEV_NPN ? 1.0 : -1.0;
+        double vbe = sg * (v1 - v2), vbc = sg * (v1 - v0);
+        double vcrit = BJT_VT * log(BJT_VT / (1.41421356 * BJT_IS));
+        if (fabs(vbe - d->v1) > 1e-9 + 1e-6 * fabs(vbe) ||
+            fabs(vbc - d->v2) > 1e-9 + 1e-6 * fabs(vbc)) {
+          converged = 0;
+        }
+
+        d->v1 = limit_diode(vbe, d->v1, BJT_VT, vcrit);
+        d->v2 = limit_diode(vbc, d->v2, BJT_VT, vcrit);
+      }
     }
 
     if (converged) {
@@ -678,7 +911,8 @@ static int step_once(pil_circuit *c, double h) {
 
   for (int k = 0; k < c->ne; k++) {
     pil_celement *e = c->els[k];
-    int ia = IA(e), ib = IB(e);
+    int ia = IA(e);
+    int ib = IB(e);
     double v = (ia >= 0 ? rhs[ia] : 0.0) - (ib >= 0 ? rhs[ib] : 0.0);
     double i = 0;
     switch (e->kind) {
@@ -708,7 +942,14 @@ static int step_once(pil_circuit *c, double h) {
       if (g > 1e6) {
         g = 1e6;
       }
-      i = e->is * (ex - 1.0) + g * (v - vd_c);
+      double id = e->is * (ex - 1.0);
+      if (e->vz > 0) {
+        double ez = exp(fmin((-vd_c - e->vz) / ZENER_N, 80.0));
+        id -= ZENER_IK * ez;
+        g += ZENER_IK * ez / ZENER_N;
+      }
+
+      i = id + g * (v - vd_c);
       break;
     }
     case CE_ISOURCE: {
@@ -726,7 +967,7 @@ static int step_once(pil_circuit *c, double h) {
 
     e->v = v;
     e->i = i;
-    // dots move in proportion to i / peak, so fastest branch always streams at
+    // Dots move in proportion to i / peak, so fastest branch always streams at
     // current_dot_speed whatever circuit's current scale
     if (fabs(i) > c->peak_i && isfinite(i)) {
       c->peak_i = fabs(i);
@@ -735,11 +976,30 @@ static int step_once(pil_circuit *c, double h) {
     e->anim_phase += i / fmax(c->peak_i, 1e-12) * h;
   }
 
+  for (int k = 0; k < c->nd; k++) {
+    pil_cdevice *d = c->devs[k];
+    if (d->kind == DEV_OPAMP) {
+      d->ti[0] = d->ti[1] = 0.0;
+      d->ti[2] = rhs[d->branch];
+    } else {
+      const double sg = d->kind == DEV_NPN ? 1.0 : -1.0;
+      double eF = exp(fmin(d->v1 / BJT_VT, 80.0));
+      double eR = exp(fmin(d->v2 / BJT_VT, 80.0));
+      double iF = BJT_IS * (eF - 1.0), iR = BJT_IS * (eR - 1.0);
+      double ic = sg * (iF - iR * (1.0 + 1.0 / BJT_BR));
+      double ib = sg * (iF / d->beta + iR / BJT_BR);
+      d->ti[0] = ic;
+      d->ti[1] = ib;
+      d->ti[2] = -(ic + ib);
+    }
+  }
+
   compute_wire_currents(c);
   for (int k = 0; k < c->nw; k++) {
     c->wires[k].anim_phase += c->wires[k].i / fmax(c->peak_i, 1e-12) * h;
   }
 
+#undef DI
 #undef IA
 #undef IB
 #undef AT
@@ -810,6 +1070,11 @@ static void circuit_reset(pil_circuit *c) {
     e->vd = 0;
   }
 
+  for (int k = 0; k < c->nd; k++) {
+    c->devs[k]->v1 = c->devs[k]->v2 = 0.0;
+    c->devs[k]->ti[0] = c->devs[k]->ti[1] = c->devs[k]->ti[2] = 0.0;
+  }
+
   for (int k = 0; k < c->nw; k++) {
     c->wires[k].i = 0;
     c->wires[k].anim_phase = 0;
@@ -857,6 +1122,11 @@ void pil_circuits_free(pil_world *w) {
       free(c->els[k]);
     }
 
+    for (int k = 0; k < c->nd; k++) {
+      free(c->devs[k]);
+    }
+
+    free(c->devs);
     free(c->els);
     free(c->nodes);
     free(c->wires);

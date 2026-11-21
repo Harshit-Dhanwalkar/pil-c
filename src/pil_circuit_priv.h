@@ -26,37 +26,64 @@ typedef enum {
 struct pil_celement {
   pil_ce_kind kind;
   pil_circuit *circuit;
-  pil_node a, b;
-  double value;       /* R, C, L, source amplitude                          */
-  double freq, phase; /* ac source                                          */
-  int ac;             /* vsource: 1 = sine, 0 = dc, 2 = user wave function  */
+  pil_node a;
+  pil_node b;
+  double value; /* R, C, L, source amplitude                          */
+  double freq;  /* Frequency of AC source                             */
+  double phase; /* Phase of AC source                                 */
+  int ac;       /* vsource: 1 = sine, 0 = dc, 2 = user wave function  */
   pil_wave_fn wave;
   void *wave_user;
-  double is, n_vt; /* diode                                                 */
-  double t_change; /* switch                                                */
+  double is;
+  double n_vt;     /* Diode                                           */
+  double t_change; /* Switch                                          */
   int closed_before;
-  double init;        /* initial v (C) or i (L)                             */
-  pil_body *mb, *mb2; /* transducer: driven body and its reaction body      */
-  pil_vec2 axis;      /* voice coil direction (unit)                        */
-  double kc, res;     /* transducer constant and winding resistance         */
-  double wm;          /* transducer: mechanical speed seen by winding       */
-  double v, i;        /* state after last step: v(a)-v(b), a->b current     */
-  double vd;          /* diode linearisation point                          */
-  int branch;         /* MNA branch unknown for L and V (-1 if none)        */
+  double init;   /* Initial v (C) or i (L)                            */
+  pil_body *mb;  /* Transducer: driven body                           */
+  pil_body *mb2; /* Transducer: reaction body                         */
+  pil_vec2 axis; /* Voice coil direction (unit)                       */
+  double kc;     /* Transducer constant                               */
+  double res;    /* Transducer winding resistance                     */
+  double wm;     /* Transducer: mechanical speed seen by winding      */
+  double v;      /* State after last step: v(a)-v(b)                  */
+  double i;      /* State after last step:  a->b current              */
+  double vd;     /* Diode linearisation point                         */
+  double vz;     /* zener breakdown voltage (0 = ordinary diode)      */
+  struct pil_celement *mate; /* coupled inductor (transformer)        */
+  double mutual; /* Mutual inductance with mate                       */
+  int branch;    /* MNA branch unknown for L and V (-1 if none)       */
+  char label[32];
+  double label_dx;
+  double label_dy;
+  int hidden;
+  double anim_phase; /* \int i dt — drives current-dot motion         */
+};
+
+typedef enum { DEV_OPAMP, DEV_NPN, DEV_PNP } pil_dev_kind;
+
+struct pil_cdevice {
+  pil_dev_kind kind;
+  pil_circuit *circuit;
+  pil_node n[3]; /* op-amp: + - out; bjt: C B E                        */
+  double vsat;   /* op-amp rail                                         */
+  double beta;   /* bjt forward current gain                            */
+  double v1, v2; /* Linearisation: op-amp v+ - v-; bjt vbe, vbc (signed)*/
+  double ti[3];  /* Current into each terminal after last step          */
+  int branch;
   char label[32];
   double label_dx, label_dy;
-  int hidden;
-  double anim_phase; /* \int i dt — drives current-dot motion */
 };
 
 typedef struct {
-  double x, y;
-  int parent; /* union-find: wires merge nodes */
+  double x;
+  double y;
+  int parent; /* Union-find: wires merge nodes */
 } pil_cnode;
 
 typedef struct {
-  pil_node a, b;
-  double i;          /* current a -> b, from KCL pass                        */
+  pil_node a;
+  pil_node b;
+  double i;          /* Current a -> b, from KCL pass                        */
   double anim_phase; /* \int i dt for dot animation                          */
 } pil_cwire;
 
@@ -68,15 +95,20 @@ struct pil_circuit {
   int nw, wcap;
   pil_celement **els;
   int ne, ecap;
+  pil_cdevice **devs;
+  int nd, dcap;
   pil_node ground;
-  double max_h, theta, t;
-  int first; /* first step after a reset is backward Euler */
+  double max_h;
+  double theta, t;
+  int first; /* First step after a reset is backward Euler */
   int newton_iters;
-  double *vn; /* node voltages of last step, indexed by node id */
-  /* scratch */
-  double *A, *rhs, *x;
+  double *vn; /* Node voltages of last step, indexed by node id */
+  /* Scratch */
+  double *A;
+  double *rhs;
+  double *x;
   int scap;
-  double peak_i; /* running maximum |i|, for stable dot speed */
+  double peak_i; /* Running maximum |i|, for stable dot speed */
 };
 
 int pil_cnode_find(const pil_circuit *c, int n);
