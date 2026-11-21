@@ -19,6 +19,7 @@ bowl|6|Circle rolling inside a circle
 collision|10|Two-disc collision in lab and CM frames, momentum arrows
 crank|6|Disc driving a crank and coupled sliders
 cycloid|5|Rolling wheel: cycloid, curtate and prolate traces
+doublependulum|20|Double pendulum from its Lagrangian, with a diverging twin
 frame|6|Sliding frame with sprung blocks and a two-link arm
 freebody|13|Torque-free asymmetric body: tumbling about the intermediate axis
 halfcar|6|Half-car on a wavy road

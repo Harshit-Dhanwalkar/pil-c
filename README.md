@@ -57,22 +57,22 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 
 # Other examples
 ## Mechanics
-./build/atwood      ./build/blocks    ./build/bowl      ./build/crank
-./build/collision   ./build/cycloid   ./build/frame     ./build/freebody
-./build/impact      ./build/incline   ./build/kepler    ./build/linkage
-./build/loop        ./build/modes     ./build/phase     ./build/projectile
-./build/pulleys     ./build/race      ./build/resonance ./build/ring
-./build/swing       ./build/tower     ./build/top       ./build/shaker
-./build/waves
+./build/atwood      ./build/blocks     ./build/bowl      ./build/crank
+./build/collision   ./build/cycloid    ./build/doublependulum
+./build/frame       ./build/freebody   ./build/impact    ./build/incline
+./build/kepler      ./build/linkage    ./build/loop      ./build/modes
+./build/phase       ./build/projectile ./build/pulleys   ./build/race
+./build/resonance   ./build/ring       ./build/swing     ./build/tower
+./build/top         ./build/shaker     ./build/waves
 ## Electrodynamics / Circuits
-./build/bridge      ./build/cyclotron ./build/exb       ./build/faraday
-./build/motor       ./build/rc        ./build/lc        ./build/rectifier
+./build/bridge      ./build/cyclotron  ./build/exb       ./build/faraday
+./build/motor       ./build/lc         ./build/rc        ./build/rectifier
 ./build/rlc
 
 make gallery
 ```
 
-Window keys: `space` pause · `r` reset · `→` step · `+`/`-` speed · `p`/`f`/`g` save
+Window keys: `space` pause · `r` reset · `$\rightarrow$` step · `+`/`-` speed · `p`/`f`/`g` save
 PNG/PDF/SVG · `h` HUD · `esc`. Mouse: left-drag pulls a body, wheel zooms,
 right-drag pans.
 
@@ -116,7 +116,7 @@ int main(void)
 - **Elements** are what you drop in. Force elements add forces; constraints remove
   degrees of freedom.
 
-| you want                                           | call                                                        |
+| If you want                                           | call                                                        |
 | -------------------------------------------------- | ----------------------------------------------------------- |
 | spring / damper                                    | `pil_add_spring`, `pil_add_damper`                          |
 | torsional spring (+damper)                         | `pil_add_torsion_spring`                                    |
@@ -139,11 +139,10 @@ int main(void)
   `_angle_marker`, `_ground`, `_gravity_indicator`. For anything else register an overlay
   with `pil_world_add_overlay` and draw with Cairo plus the public symbol primitives
   (`pil_draw_spring`, `pil_draw_dashpot`, `pil_draw_hinge`, `pil_draw_arrow`, `pil_draw_text`, ...).
-- **Text** understands `x_1`, `x_{12}`, `x^2` and UTF‑8 (`"\xcf\x86"` $\rightarrow$ φ).
 - **Plots and energy:** `pil_add_plot` + `pil_plot_add_signal` put time-series panels
 - beside the figure (curves are precomputed, a cursor follows the animation);
-- `pil_add_energy_bar` draws the E0 / -ΔE / T / V column used for impacts.
-- **Text** understands `x_1`, `x_{12}`, `x^2` and UTF‑8 (`"\xcf\x86"` $\rightarrow$ φ).
+- `pil_add_energy_bar` draws the E0 / -$\Delta$E / T / V column used for impacts.
+- **Text** understands `x_1`, `x_{12}`, `x^2`, UTF‑8 (`"\xcf\x86"` $\rightarrow$ $\phi$) and LaTeX-style macros: `"\\omega"` $\rightarrow$ $\omega$, `"\\Delta\\theta_{max}"`, `\\cdot`, `\\times`, `\\pm`, `\\approx`, `\\infty`, `\\partial`, `\\nabla`, … (a space after a macro is swallowed, as in TeX).
 
 ## Circuits
 
