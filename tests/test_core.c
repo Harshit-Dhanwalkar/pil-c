@@ -6,6 +6,7 @@
 #include <pil/pil_circuit.h>
 #include <pil/pil_core.h>
 #include <pil/pil_lagrange.h>
+#include <pil/pil_nbody.h>
 #include <pil/pil_ode.h>
 #include <pil/pil_orbit.h>
 #include <pil/pil_particle.h>
@@ -1989,6 +1990,53 @@ static void test_hohmann(void) {
         0.5 * (vx * vx + vy * vy) - 1.0 / hypot(x, y), -0.25, 1e-3);
 }
 
+static void test_nbody(void) {
+  puts("n-body: figure-eight choreography, conservation laws, Kepler pair");
+  pil_nbody s;
+  pil_nbody_figure_eight(&s);
+  double x0[3][2];
+  double e0 = pil_nbody_energy(&s);
+  double l0 = pil_nbody_angmom(&s);
+  double p[2];
+  double c[2];
+  for (int b = 0; b < 3; b++) {
+    x0[b][0] = s.x[b][0];
+    x0[b][1] = s.x[b][1];
+  }
+  pil_nbody_momentum(&s, p);
+  check("figure-eight has zero momentum", hypot(p[0], p[1]), 0.0, 1e-8);
+  pil_nbody_com(&s, c);
+  check("figure-eight centre of mass at origin", hypot(c[0], c[1]), 0.0, 1e-8);
+  int n = (int)(PIL_FIGURE_EIGHT_PERIOD / 1e-4 + 0.5);
+  double emax = 0;
+  for (int i = 0; i < n; i++) {
+    pil_nbody_step(&s, PIL_FIGURE_EIGHT_PERIOD / n);
+    double de = fabs(pil_nbody_energy(&s) - e0);
+    if (de > emax) {
+      emax = de;
+    }
+  }
+
+  check("energy error stays below 1e-6", emax < 1e-6, 1, 0);
+  check("angular momentum conserved", pil_nbody_angmom(&s) - l0, 0.0, 1e-8);
+  double back = 0;
+  for (int b = 0; b < 3; b++) {
+    back += hypot(s.x[b][0] - x0[b][0], s.x[b][1] - x0[b][1]);
+  }
+  check("every body is back after one period", back, 0.0, 2e-4);
+  // Two bodies: equal masses on a circular mutual orbit, m = 1, separation 2,
+  // v = 1/sqrt(2*2)... v^2 = G m / (2 d)
+  pil_nbody k = {
+      2, 1.0, 0.0, {1.0, 1.0}, {{-1, 0}, {1, 0}}, {{0, -0.5}, {0, 0.5}}};
+  double ek = pil_nbody_energy(&k);
+  for (int i = 0; i < 20000; i++) {
+    pil_nbody_step(&k, 1e-3);
+  }
+  check("circular pair keeps separation 2",
+        hypot(k.x[1][0] - k.x[0][0], k.x[1][1] - k.x[0][1]), 2.0, 1e-5);
+  check("circular pair keeps energy", pil_nbody_energy(&k), ek, 1e-8);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2036,6 +2084,7 @@ int main(void) {
   test_helmholtz();
   test_hohmann();
   test_kirchhoff();
+  test_nbody();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
