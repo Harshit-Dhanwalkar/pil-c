@@ -22,13 +22,15 @@
  *   pil_lsys_set_state(s, (double[]){0.2, 0.3}, (double[]){0, 0});
  *
  * T may contain terms linear in qdot (a rotating frame): they produce Coriolis
- * / gyroscopic terms. Up to PIL_LSYS_MAX_DOF coordinates
+ * / gyroscopic terms
+ * Up to PIL_LSYS_MAX_DOF coordinates
  */
 
 #ifndef PIL_LAGRANGE_H
 #define PIL_LAGRANGE_H
 
 #include "pil_core.h"
+#include "pil_particle.h" /* pil_particle3, pil_field3_fn, pil_particle3_step */
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,20 +79,6 @@ void pil_rigid3_omega(const double *q, const double *qd, double w_body[3]);
  * momentum I w is along space z; phi0 (rotation about L) is free */
 void pil_rigid3_state(const pil_rigid3 *p, const double w_body[3], double phi0,
                       double *q, double *qd);
-
-/* Charged particle in 3D with given fields (any E(x, t), B(x, t)), advanced
- * with Boris pusher: second order, and |v| is conserved exactly in a pure
- * magnetic field
- * q_m is charge over mass */
-typedef void (*pil_field3_fn)(const double x[3], double t, double B[3],
-                              double E[3], void *user);
-typedef struct {
-  double x[3];
-  double v[3];
-  double q_m;
-} pil_particle3;
-void pil_particle3_step(pil_particle3 *p, pil_field3_fn field, void *user,
-                        double t, double dt);
 
 /* Orthographic view of a z-up 3D scene: projected point is in same world units
  * as rest of figure, so annotations can use it. yaw turns scene about z, pitch

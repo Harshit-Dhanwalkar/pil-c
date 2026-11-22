@@ -1867,41 +1867,80 @@ static void test_chaos(void) {
   check("separation grew by > 1e4 in 40 drive periods", d > 1e4 * d0, 1, 0);
 }
 
-static void test_helmholtz(void) {
-  puts("Biot-Savart: loop on-axis field and Helmholtz flatness");
-  // Unit current, mu0/4pi = 1: loop of radius 1 gives B_z = 2 pi / (1 +
-  // z^2)^(3/2)
-  double d = 1.0, B[3];
-  for (int k = 0; k < 3; k++) {
-    double z = 0.2 * k - 0.2;
-    double tot = 0;
-    for (int l = 0; l < 2; l++) {
-      double z0 = l ? d / 2 : -d / 2;
-      double bz = 0;
-      for (int i = 0; i < 400; i++) {
-        double ph = 2 * 3.14159265358979 * (i + 0.5) / 400;
-        double dph = 2 * 3.14159265358979 / 400;
-        double px = cos(ph);
-        double py = sin(ph);
-        double dlx = -py * dph;
-        double dly = px * dph;
-        double rx = -px;
-        double ry = -py;
-        double rz = z - z0;
-        double r3 = pow(rx * rx + ry * ry + rz * rz, 1.5);
-        bz += (dlx * ry - dly * rx) / r3;
-      }
-      tot += bz;
-      check("single loop vs 2 pi / (1+z^2)^1.5", bz,
-            2 * 3.14159265358979 / pow(1 + (z - z0) * (z - z0), 1.5), 1e-6);
-    }
-    B[k] = tot;
-  }
-  check("Helmholtz: B(+-0.2) matches B(0) to < 0.5 % (flat)",
-        fabs(B[0] - 0.5 * (B[0] + B[2])) < 1e-9 &&
-            fabs(B[0] / B[1] - 1) < 0.005,
-        1, 0);
+static void biot_pair_cb(double x, double z, double *bx, double *bz, void *u) {
+  pil_biot_pair(*(double *)u, x, z, 400, bx, bz);
 }
+
+static void test_helmholtz(void) {
+  puts("Biot-Savart: loop on-axis field, Helmholtz flatness, field lines");
+  double bx;
+  double bz;
+  for (int k = 0; k < 3; k++) {
+    double z = 0.4 * k - 0.4;
+    pil_biot_loop(1.0, 0.1, 0.0, z, 400, &bx, &bz);
+    check("single loop vs 2 pi r^2 / (r^2 + z^2)^1.5", bz,
+          pil_biot_loop_axis(1.0, 0.1, z), 1e-6);
+    check("no radial field on the axis", bx, 0.0, 1e-9);
+  }
+
+  double b0;
+  double b1;
+  double b2;
+  double d = 1.0;
+  pil_biot_pair(d, 0, 0, 400, &bx, &b0);
+  pil_biot_pair(d, 0, 0.2, 400, &bx, &b1);
+  pil_biot_pair(d, 0, -0.2, 400, &bx, &b2);
+  check("Helmholtz: B(+-0.2) matches B(0) to < 0.5 % (flat)",
+        fabs(b1 / b0 - 1) < 0.005 && fabs(b2 / b1 - 1) < 1e-9, 1, 0);
+  d = 1.5;
+  pil_biot_pair(d, 0, 0, 400, &bx, &b0);
+  pil_biot_pair(d, 0, 0.2, 400, &bx, &b1);
+  check("d = 1.5 R: field dips in the middle", b1 > b0, 1, 0);
+  // A field line through axis stays on axis, directed along +z
+  static double px[300];
+  static double pz[300];
+  int n =
+      pil_field_line(biot_pair_cb, &d, 0.0, 0.0, 1, 0.05, 200, 5, 5, px, pz);
+  check("axis field line is straight (x = 0)", fabs(px[n - 1]), 0.0, 1e-9);
+  check("axis field line runs along +z", pz[n - 1] > 5.0 - 0.06, 1, 0);
+}
+
+// static void test_helmholtz(void) {
+//   puts("Biot-Savart: loop on-axis field and Helmholtz flatness");
+//   // Unit current, mu0/4pi = 1: loop of radius 1 gives B_z = 2 pi / (1 +
+//   // z^2)^(3/2)
+//   double d = 1.0;
+//   double B[3];
+//   for (int k = 0; k < 3; k++) {
+//     double z = 0.2 * k - 0.2;
+//     double tot = 0;
+//     for (int l = 0; l < 2; l++) {
+//       double z0 = l ? d / 2 : -d / 2;
+//       double bz = 0;
+//       for (int i = 0; i < 400; i++) {
+//         double ph = 2 * 3.14159265358979 * (i + 0.5) / 400;
+//         double dph = 2 * 3.14159265358979 / 400;
+//         double px = cos(ph);
+//         double py = sin(ph);
+//         double dlx = -py * dph;
+//         double dly = px * dph;
+//         double rx = -px;
+//         double ry = -py;
+//         double rz = z - z0;
+//         double r3 = pow(rx * rx + ry * ry + rz * rz, 1.5);
+//         bz += (dlx * ry - dly * rx) / r3;
+//       }
+//       tot += bz;
+//       check("single loop vs 2 pi / (1+z^2)^1.5", bz,
+//             2 * 3.14159265358979 / pow(1 + (z - z0) * (z - z0), 1.5), 1e-6);
+//     }
+//     B[k] = tot;
+//   }
+//   check("Helmholtz: B(+-0.2) matches B(0) to < 0.5 % (flat)",
+//         fabs(B[0] - 0.5 * (B[0] + B[2])) < 1e-9 &&
+//             fabs(B[0] / B[1] - 1) < 0.005,
+//         1, 0);
+// }
 
 static void test_hohmann(void) {
   puts("Hohmann transfer r1 = 1 -> r2 = 2: two burns, flight time, final "
@@ -1948,10 +1987,6 @@ static void test_hohmann(void) {
   check("final orbit is circular at r = 2 (rmin)", rmin, 2.0, 2e-3);
   check("specific energy = -1/(2 r2)",
         0.5 * (vx * vx + vy * vy) - 1.0 / hypot(x, y), -0.25, 1e-3);
-}
-
-static void biot_pair_cb(double x, double z, double *bx, double *bz, void *u) {
-  pil_biot_pair(*(double *)u, x, z, 400, bx, bz);
 }
 
 int main(void) {
