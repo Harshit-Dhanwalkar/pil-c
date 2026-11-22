@@ -285,58 +285,6 @@ pil_cdevice *pil_pmos(pil_circuit *c, pil_node drain, pil_node gate,
   return d;
 }
 
-// Level-1 current in nmos sense: i_d(vgs, vds) with its gm, gds; source and
-// drain swap roles when vds < 0
-static void mos_eval(double K, double vth, double vgs, double vds, double *id,
-                     double *gm, double *gds) {
-  const double lam = 0.02;
-  if (vds < 0.0) {
-    double i;
-    double g1;
-    double g2;
-    mos_eval(K, vth, vgs - vds, -vds, &i, &g1, &g2);
-    *id = -i;
-    *gm = -g1;
-    *gds = g1 + g2;
-
-    return;
-  }
-
-  double vov = vgs - vth;
-  if (vov <= 0.0) {
-    *id = *gm = *gds = 0.0;
-  } else if (vds < vov) { // Triode
-    *id = K * (vov * vds - 0.5 * vds * vds);
-    *gm = K * vds;
-    *gds = K * (vov - vds);
-  } else { // Saturation
-    double f = 1.0 + lam * (vds - vov);
-    *id = 0.5 * K * vov * vov * f;
-    *gm = K * vov * f - 0.5 * K * vov * vov * lam;
-    *gds = 0.5 * K * vov * vov * lam;
-  }
-}
-
-pil_cdevice *pil_nmos(pil_circuit *c, pil_node drain, pil_node gate,
-                      pil_node source, double K, double vth,
-                      const char *label) {
-  pil_cdevice *d = new_dev(c, DEV_NMOS, drain, gate, source, label);
-  d->beta = K;
-  d->vth = vth;
-
-  return d;
-}
-
-pil_cdevice *pil_pmos(pil_circuit *c, pil_node drain, pil_node gate,
-                      pil_node source, double K, double vth,
-                      const char *label) {
-  pil_cdevice *d = new_dev(c, DEV_PMOS, drain, gate, source, label);
-  d->beta = K;
-  d->vth = vth;
-
-  return d;
-}
-
 // Level-1 current in nmos sense: i_d(vgs, vds) with its gm, gds; the source
 // and drain swap roles when vds < 0
 static void mos_eval(double K, double vth, double vgs, double vds, double *id,
@@ -355,11 +303,11 @@ static void mos_eval(double K, double vth, double vgs, double vds, double *id,
   double vov = vgs - vth;
   if (vov <= 0.0) {
     *id = *gm = *gds = 0.0;
-  } else if (vds < vov) { // triode
+  } else if (vds < vov) { // Triode
     *id = K * (vov * vds - 0.5 * vds * vds);
     *gm = K * vds;
     *gds = K * (vov - vds);
-  } else { // saturation
+  } else { // Saturation
     double f = 1.0 + lam * (vds - vov);
     *id = 0.5 * K * vov * vov * f;
     *gm = K * vov * f - 0.5 * K * vov * vov * lam;
@@ -926,10 +874,13 @@ static int step_once(pil_circuit *c, double h) {
         const double sg = d->kind == DEV_NPN ? 1.0 : -1.0;
         double eF = exp(fmin(d->v1 / BJT_VT, 80.0));
         double eR = exp(fmin(d->v2 / BJT_VT, 80.0));
-        double iF = BJT_IS * (eF - 1.0), iR = BJT_IS * (eR - 1.0);
-        double gF = BJT_IS * eF / BJT_VT, gR = BJT_IS * eR / BJT_VT;
+        double iF = BJT_IS * (eF - 1.0);
+        double iR = BJT_IS * (eR - 1.0);
+        double gF = BJT_IS * eF / BJT_VT;
+        double gR = BJT_IS * eR / BJT_VT;
         double aC = gF, bC = -gR * (1.0 + 1.0 / BJT_BR);
-        double aB = gF / d->beta, bB = gR / BJT_BR;
+        double aB = gF / d->beta;
+        double bB = gR / BJT_BR;
         double I0C = iF - iR * (1.0 + 1.0 / BJT_BR);
         double I0B = iF / d->beta + iR / BJT_BR;
         double kC = sg * I0C - sg * (aC * d->v1 + bC * d->v2);

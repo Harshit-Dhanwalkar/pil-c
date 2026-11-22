@@ -1,9 +1,17 @@
 /* Numerical regression tests against analytic solutions */
 
 #include <math.h>
+#include <pil/pil_biot.h>
+#include <pil/pil_chaos.h>
 #include <pil/pil_circuit.h>
 #include <pil/pil_core.h>
 #include <pil/pil_lagrange.h>
+#include <pil/pil_ode.h>
+#include <pil/pil_orbit.h>
+#include <pil/pil_particle.h>
+#include <pil/pil_rotframe.h>
+#include <pil/pil_spherical.h>
+#include <pil/pil_wave.h>
 #include <stdio.h>
 
 static int fails = 0;
@@ -1940,6 +1948,10 @@ static void test_hohmann(void) {
   check("final orbit is circular at r = 2 (rmin)", rmin, 2.0, 2e-3);
   check("specific energy = -1/(2 r2)",
         0.5 * (vx * vx + vy * vy) - 1.0 / hypot(x, y), -0.25, 1e-3);
+}
+
+static void biot_pair_cb(double x, double z, double *bx, double *bz, void *u) {
+  pil_biot_pair(*(double *)u, x, z, 400, bx, bz);
 }
 
 int main(void) {

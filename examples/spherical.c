@@ -2,11 +2,13 @@
  * spherical.c - spherical pendulum from its Lagrangian
  * Bob on a rod of length l, polar angle theta from downward vertical and
  * azimuth phi:
- *   T = 1/2 m l^2 (th'^2 + sin^2 th phi'^2),   V = -m g l cos th
+ *   T = 1/2 m l^2 (th'^2 + sin^2 th phi'^2)
+ *   V = -m g l cos th
  * phi is cyclic, so L_z = m l^2 sin^2 th phi' is conserved (plotted flat)
  * while theta oscillates between two turning angles: bob's shadow on floor
- * traces a rosette. Started with a little azimuthal speed, below value 'phi'^2
- * = g / (l cos th)' of circular (conical) pendulum
+ * traces a rosette
+ * Started with a little azimuthal speed, below value 'phi'^2 = g / (l cos th)'
+ * of circular (conical) pendulum
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 1.0
