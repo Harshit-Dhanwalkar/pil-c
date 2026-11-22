@@ -317,6 +317,56 @@ static void mos_eval(double K, double vth, double vgs, double vds, double *id,
   }
 }
 
+pil_cdevice *pil_nmos(pil_circuit *c, pil_node drain, pil_node gate,
+                      pil_node source, double K, double vth,
+                      const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_NMOS, drain, gate, source, label);
+  d->beta = K;
+  d->vth = vth;
+
+  return d;
+}
+
+pil_cdevice *pil_pmos(pil_circuit *c, pil_node drain, pil_node gate,
+                      pil_node source, double K, double vth,
+                      const char *label) {
+  pil_cdevice *d = new_dev(c, DEV_PMOS, drain, gate, source, label);
+  d->beta = K;
+  d->vth = vth;
+
+  return d;
+}
+
+// Level-1 current in nmos sense: i_d(vgs, vds) with its gm, gds; the source
+// and drain swap roles when vds < 0
+static void mos_eval(double K, double vth, double vgs, double vds, double *id,
+                     double *gm, double *gds) {
+  const double lam = 0.02;
+  if (vds < 0.0) {
+    double i, g1, g2;
+    mos_eval(K, vth, vgs - vds, -vds, &i, &g1, &g2);
+    *id = -i;
+    *gm = -g1;
+    *gds = g1 + g2;
+
+    return;
+  }
+
+  double vov = vgs - vth;
+  if (vov <= 0.0) {
+    *id = *gm = *gds = 0.0;
+  } else if (vds < vov) { // triode
+    *id = K * (vov * vds - 0.5 * vds * vds);
+    *gm = K * vds;
+    *gds = K * (vov - vds);
+  } else { // saturation
+    double f = 1.0 + lam * (vds - vov);
+    *id = 0.5 * K * vov * vov * f;
+    *gm = K * vov * f - 0.5 * K * vov * vov * lam;
+    *gds = 0.5 * K * vov * vov * lam;
+  }
+}
+
 double pil_cdevice_current(const pil_cdevice *d, int term) {
   return term >= 0 && term < 3 ? d->ti[term] : 0.0;
 }
@@ -658,7 +708,8 @@ static int step_once(pil_circuit *c, double h) {
     }
   }
 
-  double *A = c->A, *rhs = c->rhs;
+  double *A = c->A;
+  double *rhs = c->rhs;
   int has_diode = 0;
   for (int k = 0; k < c->ne; k++) {
     if (c->els[k]->kind == CE_DIODE) {
@@ -686,8 +737,10 @@ static int step_once(pil_circuit *c, double h) {
 
     for (int k = 0; k < c->ne; k++) {
       pil_celement *e = c->els[k];
-      int ia = IA(e), ib = IB(e);
-      double G = 0, Ik = 0; // conductance and known current leaving a
+      int ia = IA(e);
+      int ib = IB(e);
+      double G = 0;  // Conductance
+      double Ik = 0; // Known current leaving a
       switch (e->kind) {
       case CE_RESISTOR: {
         G = 1.0 / e->value;
