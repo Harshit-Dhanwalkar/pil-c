@@ -41,6 +41,7 @@ projectile|5|Projectile with and without drag: traces and vectors
 pulleys|6|Pulley system
 race|16|Rolling down an incline: hoop, disc, sphere and a frictionless slider
 resonance|20|Swept-frequency drive: resonance curve of a damped oscillator
+rutherford|8|Rutherford scattering: hyperbolic paths and the deflection angle
 ring|6|Ring of masses
 spherical|14|Spherical pendulum: conserved L_z, shadow rosette on the floor
 shaker|6|Shaker with a driven block, rolling disc and pendulum

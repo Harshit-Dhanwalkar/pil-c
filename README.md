@@ -72,6 +72,8 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/exb        ./build/faraday    ./build/helmholtz  ./build/lc
 ./build/rc         ./build/opamp      ./build/rectifier  ./build/rlc
 ./build/transformer ./build/zener
+## Experiments
+./build/rutherford
 
 make gallery
 ```

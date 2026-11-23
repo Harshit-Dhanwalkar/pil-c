@@ -12,6 +12,7 @@
 #include <pil/pil_orbit.h>
 #include <pil/pil_particle.h>
 #include <pil/pil_rotframe.h>
+#include <pil/pil_scatter.h>
 #include <pil/pil_spherical.h>
 #include <pil/pil_wave.h>
 #include <stdio.h>
@@ -2082,6 +2083,41 @@ static void test_emwave(void) {
   check("circular intensity = c e0^2", pil_emwave_intensity(&c), 1.0, 1e-12);
 }
 
+static void test_rutherford(void) {
+  puts("Rutherford scattering: deflection, closest approach, cross section");
+  static double path[20001][2];
+  double K = 2.0, v0 = 2.0;
+  for (int k = 0; k < 4; k++) {
+    double b = 0.2 + 0.5 * k;
+    double th;
+    double rm;
+    pil_scatter_trace(K, v0, b, -12.0, 0.002, 20000, path, &th, &rm);
+    check("measured deflection = 2 atan(kappa / b)", th,
+          pil_scatter_angle(K, v0, b), 1e-2);
+    check("closest approach = kappa + sqrt(kappa^2 + b^2)", rm,
+          pil_scatter_rmin(K, v0, b), 2e-3);
+  }
+
+  // Lower side: negative impact parameter deflects other way
+  double th;
+  pil_scatter_trace(K, v0, -0.7, -12.0, 0.002, 20000, path, &th, NULL);
+  check("b < 0 deflects towards -y", th, -pil_scatter_angle(K, v0, 0.7), 1e-2);
+  check("head-on limit: r_min = 2 kappa", pil_scatter_rmin(K, v0, 0.0),
+        2.0 * K / (v0 * v0), 1e-12);
+  check("b -> infinity: no deflection", pil_scatter_angle(K, v0, 1e6), 0.0,
+        1e-5);
+  // Impact parameter and cross section: dsigma = (b / sin th) |db / dth|
+  double t0 = 1.1;
+  double d = 1e-6;
+  double bb = pil_scatter_impact(K, v0, t0),
+         dbdt = (pil_scatter_impact(K, v0, t0 + d) -
+                 pil_scatter_impact(K, v0, t0 - d)) /
+                (2 * d);
+  check("impact(angle(b)) = b", pil_scatter_angle(K, v0, bb), t0, 1e-12);
+  check("dsigma = b |db/dtheta| / sin(theta)", pil_scatter_dsigma(K, v0, t0),
+        bb * fabs(dbdt) / sin(t0), 1e-6);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2131,6 +2167,7 @@ int main(void) {
   test_kirchhoff();
   test_nbody();
   test_emwave();
+  test_rutherford();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
