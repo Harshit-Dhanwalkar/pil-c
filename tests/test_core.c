@@ -5,6 +5,7 @@
 #include <pil/pil_chaos.h>
 #include <pil/pil_circuit.h>
 #include <pil/pil_core.h>
+#include <pil/pil_emwave.h>
 #include <pil/pil_lagrange.h>
 #include <pil/pil_nbody.h>
 #include <pil/pil_ode.h>
@@ -2037,6 +2038,50 @@ static void test_nbody(void) {
   check("circular pair keeps energy", pil_nbody_energy(&k), ek, 1e-8);
 }
 
+static void test_emwave(void) {
+  puts("EM plane wave: E x B along k, B = E / c, u_E = u_B, S = c u, radiation "
+       "pressure");
+  pil_emwave w = {2.0, 1.5, 2.0 * M_PI / 4.0, 0.0, 0.3};
+  double E[3];
+  double B[3];
+  double S[3];
+  double sum_s = 0;
+  double smin = 1e9;
+  int n = 4000;
+  for (int i = 0; i < n; i++) {
+    double t = 2.0 * i / n * 1.0; // One period T = lambda / c = 2
+    double x = 0.37;
+    pil_emwave_field(&w, x, t, E, B);
+    pil_emwave_poynting(&w, x, t, S);
+    double u = pil_emwave_energy_density(&w, x, t);
+    if (i % 400 == 0) {
+      check("B = E / c (magnitude)", hypot(B[1], B[2]), hypot(E[1], E[2]) / 2.0,
+            1e-12);
+      check("E . B = 0", E[1] * B[1] + E[2] * B[2], 0.0, 1e-12);
+      check("S = c u along +x", S[0], 2.0 * u, 1e-12);
+      check("S has no transverse part", hypot(S[1], S[2]), 0.0, 1e-12);
+    }
+
+    sum_s += S[0];
+    if (S[0] < smin) {
+      smin = S[0];
+    }
+  }
+
+  check("S never negative", smin >= -1e-12, 1, 0);
+  check("mean S = c e0^2 / 2", sum_s / n, pil_emwave_intensity(&w), 1e-9);
+  check("intensity = c e0^2 / 2", pil_emwave_intensity(&w),
+        0.5 * 2.0 * 1.5 * 1.5, 1e-12);
+  check("reflector feels twice the pressure", pil_emwave_pressure(&w, 1),
+        2.0 * pil_emwave_pressure(&w, 0), 1e-12);
+  // Circular polarisation: constant energy density and flux
+  pil_emwave c = {1.0, 1.0, 1.0, 1.0, 0.0};
+  double u0 = pil_emwave_energy_density(&c, 0, 0);
+  double u1 = pil_emwave_energy_density(&c, 0.7, 1.9);
+  check("circular polarisation: u is constant", u1, u0, 1e-12);
+  check("circular intensity = c e0^2", pil_emwave_intensity(&c), 1.0, 1e-12);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2085,6 +2130,7 @@ int main(void) {
   test_hohmann();
   test_kirchhoff();
   test_nbody();
+  test_emwave();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

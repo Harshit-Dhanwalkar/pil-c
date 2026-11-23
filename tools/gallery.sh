@@ -55,6 +55,7 @@ belts|70|Proton trapped in a dipole field: gyration, bounce and westward drift
 bridge|10|Full-wave bridge rectifier with smoothing capacitor
 cmos|5|CMOS inverter: transfer curve and shoot-through current
 cyclotron|8|Charges in a magnetic field: circles and equal periods
+emwave|2|Electromagnetic wave: E, B and the Poynting vector
 exb|9|E x B drift of a charge from rest
 faraday|12|Loop pulled through a magnetic field: flux, emf and Lenz braking
 helmholtz|10|Helmholtz coils: Biot-Savart field lines as the separation grows
