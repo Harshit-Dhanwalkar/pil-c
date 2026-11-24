@@ -2118,6 +2118,47 @@ static void test_rutherford(void) {
         bb * fabs(dbdt) / sin(t0), 1e-6);
 }
 
+static void test_electrostatic(void) {
+  puts("electrostatics: Coulomb field, Gauss's law, field lines, energy");
+  pil_charges c = {2, {1.0, -0.4}, {{-1.5, 0}, {1.5, 0}}};
+  double ex;
+  double ey;
+  pil_charges one = {1, {2.0}, {{0, 0}}};
+  pil_es_field(&one, 3.0, 4.0, &ex, &ey);
+  check("point charge: |E| = q / r^2", hypot(ex, ey), 2.0 / 25.0, 1e-12);
+  check("point charge: V = q / r", pil_es_potential(&one, 3.0, 4.0), 2.0 / 5.0,
+        1e-12);
+  // Gauss: flux through any sphere around both charges = 4 pi (q1 + q2); only
+  // enclosed charge counts
+  check("flux through R = 3 sphere = 4 pi (q1 + q2)",
+        pil_es_flux_sphere(&c, 0.0, 3.0, 400), 4.0 * M_PI * 0.6, 1e-4);
+  check("flux does not depend on the radius",
+        pil_es_flux_sphere(&c, 0.3, 7.0, 400), 4.0 * M_PI * 0.6, 1e-4);
+  check("flux through a sphere enclosing only q1 = 4 pi q1",
+        pil_es_flux_sphere(&c, -1.5, 0.8, 400), 4.0 * M_PI * 1.0, 1e-4);
+  check("charges outside give zero flux",
+        pil_es_flux_sphere(&c, -9.0, 0.5, 400), 0.0, 1e-5);
+  // Dipole: V = 0 on mid-plane, field there parallel to axis
+  pil_charges d = {2, {1.0, -1.0}, {{-1, 0}, {1, 0}}};
+  check("dipole: V = 0 on the mid-plane", pil_es_potential(&d, 0.0, 1.3), 0.0,
+        1e-12);
+  pil_es_field(&d, 0.0, 1.3, &ex, &ey);
+  check("dipole: E on the mid-plane has no y part", ey, 0.0, 1e-12);
+  check("dipole energy = -q^2 / r12", pil_es_energy(&d), -0.5, 1e-12);
+  // A field line from + ends on - (opposite equal charges)
+  static double px[4000], py[4000];
+  int n = pil_es_field_line(&d, -1.0 + 0.12 * cos(2.0), 0.12 * sin(2.0), 1, 0,
+                            0.02, 3999, 20, 20, 0.1, px, py);
+  check("line from + ends at the - charge",
+        hypot(px[n - 1] - 1.0, py[n - 1]) < 0.12, 1, 0);
+  // Like charges: no line connects them, lines run off to infinity
+  pil_charges l = {2, {1.0, 1.0}, {{-1, 0}, {1, 0}}};
+  n = pil_es_field_line(&l, -1.0 + 0.12 * cos(1.0), 0.12 * sin(1.0), 1, 0, 0.04,
+                        3999, 8, 8, 0.1, px, py);
+  check("like charges: line escapes to the boundary",
+        fabs(px[n - 1]) > 7.9 || fabs(py[n - 1]) > 7.9, 1, 0);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2154,8 +2195,9 @@ int main(void) {
   test_devices();
   test_hoop();
   test_double_pendulum();
-  test_spherical();
+  test_kirchhoff();
   test_doppler();
+  test_spherical();
   test_mosfet();
   test_rlc_response();
   test_boris();
@@ -2164,10 +2206,10 @@ int main(void) {
   test_chaos();
   test_helmholtz();
   test_hohmann();
-  test_kirchhoff();
   test_nbody();
   test_emwave();
   test_rutherford();
+  test_electrostatic();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
