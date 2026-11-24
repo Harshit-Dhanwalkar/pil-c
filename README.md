@@ -69,9 +69,9 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ## Electrodynamics / Electostatics / Circuits
 ./build/bjt        ./build/bode       ./build/bottle     ./build/belts
 ./build/bridge     ./build/cmos       ./build/cyclotron  ./build/emwave
-./build/exb        ./build/faraday    ./build/helmholtz  ./build/lc
-./build/rc         ./build/opamp      ./build/rectifier  ./build/rlc
-./build/transformer ./build/zener
+./build/exb        ./build/faraday    ./build/gauss      ./build/helmholtz
+./build/lc         ./build/rc         ./build/opamp      ./build/rectifier
+./build/rlc        ./build/transformer ./build/zener
 ## Experiments
 ./build/rutherford
 
