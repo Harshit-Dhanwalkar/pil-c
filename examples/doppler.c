@@ -5,12 +5,14 @@
  * length (1 - v/c) c T_0) and spread out behind ((1 + v/c) c T_0)
  * Plot counts pulses received by an observer ahead and one behind: slopes are
  * f / (1 - v/c) and f / (1 + v/c), a ratio of 3 here
+ * Everything is public-API
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 1.0
 #define PIL_EXAMPLE_IMAGE_TIME 12.0
 #include "example_main.h"
 #include <math.h>
+#include <pil/pil_wave.h>
 
 #define C_ 1.0
 #define V_ 0.5
@@ -19,30 +21,18 @@
 #define XA_ 5.5  // Observer ahead
 #define XB_ -5.5 // Observer behind
 
-// Pulses received by an observer at xo by time t
-static int received(double xo, double t) {
-  int n = 0;
-  for (int i = 0; i * T0_ <= t; i++) {
-    double te = i * T0_;
-    double xs = X0_ + V_ * te;
-    if (te + fabs(xo - xs) / C_ <= t) {
-      n++;
-    }
-  }
-
-  return n;
-}
+static const pil_wave_source src = {C_, V_, X0_, T0_};
 
 static double sig_ahead(const pil_world *w, void *u) {
   (void)u;
 
-  return received(XA_, pil_world_time(w));
+  return pil_wave_received(&src, XA_, pil_world_time(w));
 }
 
 static double sig_behind(const pil_world *w, void *u) {
   (void)u;
 
-  return received(XB_, pil_world_time(w));
+  return pil_wave_received(&src, XB_, pil_world_time(w));
 }
 
 static void overlay(cairo_t *cr, const pil_view *v, void *user) {
@@ -59,11 +49,12 @@ static void overlay(cairo_t *cr, const pil_view *v, void *user) {
   cairo_clip_extents(cr, &cx1, &cy1, &cx2, &cy2);
   cairo_save(cr);
   cairo_rectangle(cr, cx1, cy1, cx2 - cx1,
-                  0.66 * (cy2 - cy1)); // above the plot
+                  0.66 * (cy2 - cy1)); // Above plot
   cairo_clip(cr);
   cairo_set_line_width(cr, st.thin_w * 1.2);
   for (int i = 0; i * T0_ <= t; i++) {
-    double te = i * T0_; double r = C_ * (t - te);
+    double te = i * T0_;
+    double r = C_ * (t - te);
     if (r > 12.0) {
       continue;
     }

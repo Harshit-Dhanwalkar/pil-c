@@ -15,6 +15,8 @@
 #define PIL_EXAMPLE_IMAGE_TIME 30.0
 #include "example_main.h"
 #include <math.h>
+#include <pil/pil_ode.h>
+#include <pil/pil_rotframe.h>
 
 #define W0 6.283185307179586
 #define WR 0.15
@@ -28,37 +30,6 @@ typedef struct {
   int n;
   const pil_world *w;
 } fou_t;
-
-static void deriv(const double s[4], double d[4]) {
-  d[0] = s[2];
-  d[1] = s[3];
-  d[2] = -W0 * W0 * s[0] + 2 * WR * s[3];
-  d[3] = -W0 * W0 * s[1] - 2 * WR * s[2];
-}
-
-static void rk4(double s[4], double h) {
-  double k1[4];
-  double k2[4];
-  double k3[4];
-  double k4[4];
-  double t[4];
-  deriv(s, k1);
-  for (int i = 0; i < 4; i++) {
-    t[i] = s[i] + 0.5 * h * k1[i];
-  }
-  deriv(t, k2);
-  for (int i = 0; i < 4; i++) {
-    t[i] = s[i] + 0.5 * h * k2[i];
-  }
-  deriv(t, k3);
-  for (int i = 0; i < 4; i++) {
-    t[i] = s[i] + h * k3[i];
-  }
-  deriv(t, k4);
-  for (int i = 0; i < 4; i++) {
-    s[i] += h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
-  }
-}
 
 static int idx(const fou_t *f) {
   int i = (int)(pil_world_time(f->w) / DT);
@@ -141,28 +112,20 @@ int main(int argc, char **argv) {
   f.y = malloc((size_t)f.n * sizeof *f.y);
   f.psi = malloc((size_t)f.n * sizeof *f.psi);
 
+  pil_foucault fc = {W0, WR};
   double s[4] = {1.0, 0, 0, 0}; // Released from rest at x = 1
   for (int i = 0; i < f.n; i++) {
     f.x[i] = s[0];
     f.y[i] = s[1];
-    rk4(s, DT);
+    pil_rk4_step(pil_foucault_deriv, 4, i * DT, s, DT, &fc);
   }
 
-  // Plane angle from second moments of last full period, unwrapped
+  // Plane angle over last full period, unwrapped (plane is defined mod pi)
   int per = (int)(1.0 / DT);
   double prev = 0;
   for (int i = 0; i < f.n; i++) {
     int j0 = i - per > 0 ? i - per : 0;
-    double sxx = 0;
-    double syy = 0;
-    double sxy = 0;
-    for (int j = j0; j <= i; j++) {
-      sxx += f.x[j] * f.x[j];
-      syy += f.y[j] * f.y[j];
-      sxy += f.x[j] * f.y[j];
-    }
-
-    double ps = i < per / 2 ? 0.0 : 0.5 * atan2(2 * sxy, sxx - syy);
+    double ps = i < per / 2 ? 0.0 : pil_plane_angle(f.x, f.y, j0, i);
     while (ps - prev > M_PI / 2) {
       ps -= M_PI;
     }

@@ -6,12 +6,14 @@
  * Flight time pi sqrt(a^3 / mu) with a = (r1 + r2) / 2
  * Plots: radius and specific energy -mu / 2a against time, with energy steps of
  * burns
+ * Everything is public-API
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 1.0
 #define PIL_EXAMPLE_IMAGE_TIME 11.0
 #include "example_main.h"
 #include <math.h>
+#include <pil/pil_orbit.h>
 
 #define R1 1.0
 #define R2 2.0

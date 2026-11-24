@@ -17,6 +17,7 @@
 #include "example_main.h"
 #include <math.h>
 #include <pil/pil_lagrange.h>
+#include <pil/pil_particle.h>
 
 #define B0 3.0
 #define LB 3.0
@@ -32,26 +33,7 @@ typedef struct {
   pil_proj3 pr;
 } bottle_t;
 
-static void bfield(const double x[3], double t, double B[3], double E[3],
-                   void *u) {
-  (void)t;
-  (void)u;
-  B[0] = -B0 * x[0] * x[2] / (LB * LB);
-  B[1] = -B0 * x[1] * x[2] / (LB * LB);
-  B[2] = B0 * (1.0 + x[2] * x[2] / (LB * LB));
-  E[0] = E[1] = E[2] = 0.0;
-}
-
-static double mu_of(const pil_particle3 *p) {
-  double B[3];
-  double E[3];
-  bfield(p->x, 0, B, E, NULL);
-  double bm = sqrt(B[0] * B[0] + B[1] * B[1] + B[2] * B[2]);
-  double vpar = (p->v[0] * B[0] + p->v[1] * B[1] + p->v[2] * B[2]) / bm;
-  double v2 = p->v[0] * p->v[0] + p->v[1] * p->v[1] + p->v[2] * p->v[2];
-
-  return 0.5 * (v2 - vpar * vpar) / bm;
-}
+static pil_bottle fld = {B0, LB};
 
 static int idx(const bottle_t *b) {
   int i = (int)(pil_world_time(b->w) / DT);
@@ -87,7 +69,8 @@ static void overlay(cairo_t *cr, const pil_view *v, void *user) {
   for (int k = 0; k < 8; k++) {
     double a = 2 * M_PI * k / 8;
     for (int i = 0; i <= 40; i++) {
-      double z = -2.4 + 4.8 * i / 40, rho = 1.0 / sqrt(1.0 + z * z / (LB * LB));
+      double z = -2.4 + 4.8 * i / 40;
+      double rho = 1.0 / sqrt(1.0 + z * z / (LB * LB));
       pil_vec2 q = pil_view_to_screen(
           v, pil_proj3_point(&b->pr, rho * cos(a), rho * sin(a), z));
       if (i == 0) {
@@ -156,8 +139,8 @@ int main(int argc, char **argv) {
     }
 
     b.z[i] = p.x[2];
-    b.mu[i] = mu_of(&p);
-    pil_particle3_step(&p, bfield, NULL, i * DT, DT);
+    b.mu[i] = pil_particle3_moment(&p, pil_field_bottle, &fld, i * DT);
+    pil_particle3_step(&p, pil_field_bottle, &fld, i * DT, DT);
   }
 
   pil_world *w = pil_world_new();

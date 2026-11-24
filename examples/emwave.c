@@ -8,6 +8,7 @@
  * frequency
  * Plot: energy density u(t) and S(t) at a fixed place, with two equal halves of
  * u (electric, magnetic) and mean intensity
+ * Everything is public-API
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 1.0

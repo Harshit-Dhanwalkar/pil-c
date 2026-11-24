@@ -16,6 +16,7 @@
 #define PIL_EXAMPLE_IMAGE_TIME 5.0
 #include "example_main.h"
 #include <math.h>
+#include <pil/pil_biot.h>
 
 #define NSEG 200
 #define TSPAN 10.0
@@ -29,23 +30,8 @@ static double sep(double t) {
   return 0.5 + s;
 }
 
-// B at (x, 0, z) from loops at z = +-d/2 (unit current, mu0/4pi = 1)
-static void field(double d, double x, double z, double *bx, double *bz) {
-  *bx = *bz = 0;
-  for (int k = 0; k < 2; k++) {
-    double z0 = k ? d / 2 : -d / 2;
-    for (int i = 0; i < NSEG; i++) {
-      double ph = 2 * M_PI * (i + 0.5) / NSEG, dph = 2 * M_PI / NSEG;
-      double px = cos(ph);
-      double py = sin(ph);
-      double dlx = -py * dph;
-      double dly = px * dph;
-      double rx = x - px, ry = -py, rz = z - z0;
-      double r3 = pow(rx * rx + ry * ry + rz * rz, 1.5);
-      *bx += (dly * rz) / r3; // (dl x r)_x = dl_y r_z - dl_z r_y
-      *bz += (dlx * ry - dly * rx) / r3;
-    }
-  }
+static void pair_field(double x, double z, double *bx, double *bz, void *user) {
+  pil_biot_pair(*(double *)user, x, z, NSEG, bx, bz);
 }
 
 typedef struct {
@@ -57,52 +43,35 @@ static void overlay(cairo_t *cr, const pil_view *v, void *user) {
   pil_style st = pil_style_textbook();
   double d = sep(pil_world_time(h->w));
 
-  // field lines from seeds on the mid-plane, traced both ways
+  // Field lines from seeds on mid-plane, traced both ways
   cairo_new_path(cr);
   cairo_set_source_rgb(cr, 0.25, 0.25, 0.25);
   cairo_set_line_width(cr, st.thin_w * 1.3);
   double seeds[] = {0.0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1.15, 1.4, 1.8};
+  static double px[701], pz[701];
   for (int s = 0; s < 10; s++) {
-    for (int sgn = -1; sgn <= 1; sgn += 2) {
+    for (int dir = -1; dir <= 1; dir += 2) {
       for (int side = -1; side <= 1; side += 2) {
         if (seeds[s] == 0.0 && side == 1) {
           continue;
         }
-        double x = side * seeds[s];
-        double z = 0;
-        pil_vec2 q = pil_view_to_screen(v, pil_v2(z, x));
-        cairo_move_to(cr, q.x, q.y);
-        for (int n = 0; n < 700; n++) {
-          double bx;
-          double bz;
-          field(d, x, z, &bx, &bz);
-          double bm = hypot(bx, bz);
-          if (bm < 1e-9) {
-            break;
-          }
-          // Midpoint step along the line
-          double hs = 0.03 * sgn;
-          double mx = x + 0.5 * hs * bx / bm;
-          double mz = z + 0.5 * hs * bz / bm;
-          field(d, mx, mz, &bx, &bz);
-          bm = hypot(bx, bz);
-          x += hs * bx / bm;
-          z += hs * bz / bm;
-          if (fabs(x) > 2.6 || fabs(z) > 3.4) {
-            break;
-          }
-          q = pil_view_to_screen(v, pil_v2(z, x));
-          cairo_line_to(cr, q.x, q.y);
-          if (n > 20 && hypot(x - side * seeds[s], z) < 0.03) {
-            break;
+        int n = pil_field_line(pair_field, &d, side * seeds[s], 0.0, dir, 0.03,
+                               700, 2.6, 3.4, px, pz);
+        for (int k = 0; k < n; k++) {
+          pil_vec2 q = pil_view_to_screen(v, pil_v2(pz[k], px[k]));
+          if (k == 0) {
+            cairo_move_to(cr, q.x, q.y);
+          } else {
+            cairo_line_to(cr, q.x, q.y);
           }
         }
+
         cairo_stroke(cr);
       }
     }
   }
 
-  // Loops seen edge-on: current out of the page at x = +R, into it at x = -R
+  // Loops seen edge-on: current out of page at x = +R, into it at x = -R
   for (int k = 0; k < 2; k++) {
     double z0 = k ? d / 2 : -d / 2;
     for (int sd = -1; sd <= 1; sd += 2) {
@@ -140,9 +109,9 @@ static double sig_dev(const pil_world *w, void *u) {
   double b1;
   double b2;
   double h = 0.15;
-  field(d, 0, 0, &bx, &b0);
-  field(d, 0, h, &bx, &b1);
-  field(d, 0, -h, &bx, &b2);
+  pair_field(0, 0, &bx, &b0, &d);
+  pair_field(0, h, &bx, &b1, &d);
+  pair_field(0, -h, &bx, &b2, &d);
 
   return (b1 + b2 - 2 * b0) / (b0 * h * h);
 }

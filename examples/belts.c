@@ -16,6 +16,7 @@
 #include "example_main.h"
 #include <math.h>
 #include <pil/pil_lagrange.h>
+#include <pil/pil_particle.h>
 
 #define B0 100.0
 #define DT 0.004
@@ -30,17 +31,7 @@ typedef struct {
   pil_proj3 pr;
 } belts_t;
 
-static void dipole(const double x[3], double t, double B[3], double E[3],
-                   void *u) {
-  (void)t;
-  (void)u;
-  double r2 = x[0] * x[0] + x[1] * x[1] + x[2] * x[2];
-  double r5 = r2 * r2 * sqrt(r2);
-  B[0] = -3.0 * B0 * x[2] * x[0] / r5;
-  B[1] = -3.0 * B0 * x[2] * x[1] / r5;
-  B[2] = B0 * (r2 - 3.0 * x[2] * x[2]) / r5;
-  E[0] = E[1] = E[2] = 0.0;
-}
+static pil_dipole fld = {B0, 1.0};
 
 static int idx(const belts_t *b) {
   int i = (int)(pil_world_time(b->w) / DT);
@@ -51,7 +42,8 @@ static int idx(const belts_t *b) {
 static void curve(cairo_t *cr, const pil_view *v, const pil_proj3 *pr, double L,
                   double lon, double lat0, double lat1) {
   for (int i = 0; i <= 60; i++) {
-    double lat = lat0 + (lat1 - lat0) * i / 60, r = L * cos(lat) * cos(lat);
+    double lat = lat0 + (lat1 - lat0) * i / 60;
+    double r = L * cos(lat) * cos(lat);
     pil_vec2 q = pil_view_to_screen(
         v, pil_proj3_point(pr, r * cos(lat) * cos(lon), r * cos(lat) * sin(lon),
                            r * sin(lat)));
@@ -100,7 +92,8 @@ static void overlay(cairo_t *cr, const pil_view *v, void *user) {
   int first = cur - span > 0 ? cur - span : 0;
   cairo_set_line_width(cr, 1.0);
   for (int i = first + 1; i <= cur; i += 2) {
-    double age = (double)(cur - i) / span, g = 0.05 + 0.85 * age;
+    double age = (double)(cur - i) / span;
+    double g = 0.05 + 0.85 * age;
     pil_vec2 p0 = pil_view_to_screen(
         v, pil_proj3_point(&b->pr, b->pos[i - 1][0], b->pos[i - 1][1],
                            b->pos[i - 1][2]));
@@ -146,7 +139,8 @@ int main(int argc, char **argv) {
   // Guiding centre on equator at r = 3 R (proton starts one gyro-radius
   // inside), v_perp = 1, v_par = 0.5 along field
   pil_particle3 p = {{2.79, 0, 0}, {0, 1.0, 0.5}, 1.0};
-  double prev = 0, acc = 0;
+  double prev = 0;
+  double acc = 0;
   for (int i = 0; i < b.n; i++) {
     for (int k = 0; k < 3; k++) {
       b.pos[i][k] = p.x[k];
@@ -167,7 +161,7 @@ int main(int argc, char **argv) {
     prev = ph;
     b.z[i] = p.x[2];
     b.lon[i] = acc;
-    pil_particle3_step(&p, dipole, NULL, i * DT, DT);
+    pil_particle3_step(&p, pil_field_dipole, &fld, i * DT, DT);
   }
 
   pil_world *w = pil_world_new();
