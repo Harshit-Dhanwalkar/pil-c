@@ -5,17 +5,18 @@
 #include <pil/pil_chaos.h>
 #include <pil/pil_circuit.h>
 #include <pil/pil_core.h>
+#include <pil/pil_electrostatic.h>
 #include <pil/pil_emwave.h>
 #include <pil/pil_lagrange.h>
 #include <pil/pil_nbody.h>
 #include <pil/pil_ode.h>
+#include <pil/pil_optics.h>
 #include <pil/pil_orbit.h>
 #include <pil/pil_particle.h>
 #include <pil/pil_rotframe.h>
 #include <pil/pil_scatter.h>
 #include <pil/pil_spherical.h>
 #include <pil/pil_wave.h>
-#include <pil/pil_electrostatic.h>
 #include <stdio.h>
 
 static int fails = 0;
@@ -2160,6 +2161,69 @@ static void test_electrostatic(void) {
         fabs(px[n - 1]) > 7.9 || fabs(py[n - 1]) > 7.9, 1, 0);
 }
 
+static void test_optics(void) {
+  puts("optics: Snell, TIR, Brewster, Fresnel, prism, thin lens");
+  double tt, d2r = M_PI / 180.0;
+  check("Snell: air -> glass 30 deg",
+        pil_snell(1.0, 1.5, 30 * d2r, &tt) ? tt : -1, asin(0.5 / 1.5), 1e-12);
+  check("critical angle glass -> air = 41.81 deg",
+        pil_critical_angle(1.5, 1.0) / d2r, 41.8103, 1e-3);
+  check("no critical angle going into denser medium",
+        isnan(pil_critical_angle(1.0, 1.5)), 1, 0);
+  check("TIR beyond the critical angle", pil_snell(1.5, 1.0, 45 * d2r, &tt), 0,
+        0);
+  double bw = pil_brewster_angle(1.0, 1.5);
+  check("Brewster: R_p = 0", pil_fresnel_rp(1.0, 1.5, bw), 0.0, 1e-12);
+  check("Brewster: reflected and refracted rays are perpendicular",
+        bw + asin(sin(bw) / 1.5), M_PI / 2, 1e-12);
+  check("normal incidence R = ((n1 - n2)/(n1 + n2))^2",
+        pil_fresnel_rs(1.0, 1.5, 0.0), 0.04, 1e-12);
+  check("R_s = R_p at normal incidence", pil_fresnel_rp(1.0, 1.5, 0.0),
+        pil_fresnel_rs(1.0, 1.5, 0.0), 1e-12);
+  check("R = 1 in total internal reflection",
+        pil_fresnel_rs(1.5, 1.0, 50 * d2r), 1.0, 0);
+  // Vector form agrees with the angle form
+  double ti = 25 * d2r;
+  double d[2] = {sin(ti), -cos(ti)};
+  double nrm[2] = {0, 1};
+  double out[2];
+  check("vector refraction gives Snell's angle",
+        pil_refract(d, nrm, 1.0, 1.5, out) ? atan2(out[0], -out[1]) : -1,
+        asin(sin(ti) / 1.5), 1e-12);
+  check("refracted direction is a unit vector", hypot(out[0], out[1]), 1.0,
+        1e-12);
+  double d3[2] = {sin(50 * d2r), cos(50 * d2r)};
+  double n3[2] = {0, -1};
+  check("vector form: TIR returns reflection",
+        pil_refract(d3, n3, 1.5, 1.0, out), 0, 0);
+  check("reflected ray keeps the angle (x)", out[0], d3[0], 1e-12);
+  check("reflected ray flips the normal component (y)", out[1], -d3[1], 1e-12);
+  // Prism: scan the incidence angle for the minimum deviation
+  double apex = 60 * d2r;
+  double best = 1e9;
+  double tbest = 0;
+  for (int i = 0; i < 8000; i++) {
+    double a = (10.0 + 0.01 * i) * d2r;
+    double dv = pil_prism_deviation(apex, 1.5, a);
+    if (!isnan(dv) && dv < best) {
+      best = dv;
+      tbest = a;
+    }
+  }
+
+  check("prism min deviation matches 2 asin(n sin(A/2)) - A", best,
+        pil_prism_min_deviation(apex, 1.5), 1e-6);
+  check("minimum deviation at symmetric passage", asin(1.5 * sin(0.5 * apex)),
+        tbest, 1e-3);
+  check("thin lens: object at 2f images at 2f", pil_lens_image(0.1, 0.2), 0.2,
+        1e-12);
+  check("thin lens: magnification -1 at 2f", pil_lens_magnification(0.1, 0.2),
+        -1.0, 1e-12);
+  check("object inside f: virtual, upright, magnified",
+        pil_lens_image(0.1, 0.05) < 0 && pil_lens_magnification(0.1, 0.05) > 1,
+        1, 0);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2211,6 +2275,7 @@ int main(void) {
   test_emwave();
   test_rutherford();
   test_electrostatic();
+  test_optics();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

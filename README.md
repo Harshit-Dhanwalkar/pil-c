@@ -56,7 +56,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/halfcar   --live              # interactive window
 
 # Other examples
-## Mechanics
+## Classical Mechanics
 ./build/atwood     ./build/blocks     ./build/bowl       ./build/crank
 ./build/collision  ./build/cycloid    ./build/doppler    ./build/doublependulum
 ./build/figure8    ./build/foucault   ./build/frame      ./build/freebody
@@ -72,8 +72,10 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/exb        ./build/faraday    ./build/gauss      ./build/helmholtz
 ./build/lc         ./build/rc         ./build/opamp      ./build/rectifier
 ./build/rlc        ./build/transformer ./build/zener
-## Experiments
+## Atomic Structure
 ./build/rutherford
+# Optics
+./build/snell
 
 make gallery
 ```

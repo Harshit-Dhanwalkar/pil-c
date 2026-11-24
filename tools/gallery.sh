@@ -12,7 +12,7 @@ REPO=${REPO:-https://github.com/Harshit-Dhanwalkar/pil-c}
 mkdir -p "$OUT/assets"
 
 # name | seconds | title
-LIST='
+LIST="
 atwood|6|Atwood machine
 blocks|6|Two blocks with pendulums
 bowl|6|Circle rolling inside a circle
@@ -67,7 +67,8 @@ rectifier|5|Half-wave rectifier
 rlc|5|Series RLC driven by an AC source
 transformer|5|Step-up transformer with dot convention
 zener|5|Zener shunt regulator against supply ripple
-'
+snell|4|Snell's law, total internal reflection and Fresnel reflectance
+"
 
 CARDS=
 for row in $(echo "$LIST" | tr ' ' '_'); do
