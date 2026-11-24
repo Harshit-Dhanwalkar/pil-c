@@ -15,6 +15,7 @@
 #include <pil/pil_scatter.h>
 #include <pil/pil_spherical.h>
 #include <pil/pil_wave.h>
+#include <pil/pil_electrostatic.h>
 #include <stdio.h>
 
 static int fails = 0;
