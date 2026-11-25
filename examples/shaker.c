@@ -5,7 +5,6 @@
  * Box 3m is held by spring k and dashpot d to wall and by spring 2k to driven
  * point; on it a disc 2m rolls against spring k and dashpot d; a pendulum m of
  * length l hangs from ceiling hinge and is tied to box by spring 2k
- *
  * Three coordinates: box x, disc position, pendulum angle phi
  * Everything is public-API
  */

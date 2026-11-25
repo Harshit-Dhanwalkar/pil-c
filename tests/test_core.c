@@ -15,6 +15,7 @@
 #include <pil/pil_particle.h>
 #include <pil/pil_rotframe.h>
 #include <pil/pil_scatter.h>
+#include <pil/pil_solenoid.h>
 #include <pil/pil_spherical.h>
 #include <pil/pil_timer555.h>
 #include <pil/pil_wave.h>
@@ -2405,6 +2406,31 @@ static void test_equipotential(void) {
   check("potential stays 0 along it", vv, 0.0, 1e-9);
 }
 
+static void test_solenoid(void) {
+  puts(
+      "solenoid: summed loops vs the exact sheet formula, long-solenoid limit");
+  double bx;
+  double bz;
+  for (int k = 0; k < 3; k++) {
+    double z = 0.0 + 1.1 * k;
+    pil_solenoid(1.0, 6.0, 24, 0.0, z, 200, &bx, &bz);
+    check("on-axis sum vs sheet formula",
+          bz / pil_solenoid_axis(1.0, 6.0, 4.0, z), 1.0, 3e-3);
+    check("axial field only on the axis", bx, 0.0, 1e-9);
+  }
+
+  pil_solenoid(1.0, 20.0, 80, 0.0, 0.0, 200, &bx, &bz);
+  double bin = bz;
+  check("long solenoid centre -> 4 pi n", bin / pil_solenoid_ideal(4.0), 1.0,
+        6e-3);
+  pil_solenoid(1.0, 20.0, 80, 3.0, 0.0, 200, &bx, &bz);
+  check("outside field is < 1 % of inside", fabs(bz) / bin < 0.01 ? 1.0 : 0.0,
+        1.0, 0.0);
+  check("sheet formula centre = n 4 pi L / sqrt(L^2 + 4 r^2)",
+        pil_solenoid_axis(1.0, 6.0, 4.0, 0.0) / pil_solenoid_ideal(4.0),
+        6.0 / sqrt(36.0 + 4.0), 1e-12);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2461,6 +2487,7 @@ int main(void) {
   test_prism_glass();
   test_timer555();
   test_equipotential();
+  test_solenoid();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

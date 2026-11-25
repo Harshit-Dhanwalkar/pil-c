@@ -9,6 +9,7 @@
  * Plot: Fresnel reflectance for two polarisations against incidence angle:
  * p-curve touches zero at Brewster's angle (33.7 degrees), both reach 1 at
  * critical angle
+ * Everything is public-API
  */
 
 #define PIL_EXAMPLE_TIME_SCALE 1.0

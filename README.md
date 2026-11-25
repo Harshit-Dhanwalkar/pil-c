@@ -70,7 +70,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/bjt        ./build/bode       ./build/belts      ./build/bridge
 ./build/cmos       ./build/cyclotron  ./build/exb        ./build/lc
 ./build/rc         ./build/opamp      ./build/rectifier  ./build/rlc
-./build/timer555   ./build/transformer ./build/zener
+/build/solenoid    ./build/timer555   ./build/transformer ./build/zener
 ## Electrodynamics / Electostatics
 ./build/bottle     ./build/emwave     ./build/faraday    ./build/gauss
 ./build/helmholtz  ./build/equipotential
