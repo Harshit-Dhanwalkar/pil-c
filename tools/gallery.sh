@@ -68,6 +68,7 @@ rlc|5|Series RLC driven by an AC source
 transformer|5|Step-up transformer with dot convention
 zener|5|Zener shunt regulator against supply ripple
 snell|4|Snell's law, total internal reflection and Fresnel reflectance
+lens|3|Thin lens ray diagram: real, inverted image becomes virtual as the object nears the focus
 "
 
 CARDS=

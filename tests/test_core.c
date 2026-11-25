@@ -2224,6 +2224,42 @@ static void test_optics(void) {
         1, 0);
 }
 
+static void test_lens_rays(void) {
+  puts("thin lens: principal rays meet at the image");
+  double f = 1.0;
+  double h = 0.55;
+  double dos[5] = {
+      3.4, 2.0, 1.5, 0.8,
+      0.4}; // Real inverted, 2f, between f and 2f, virtual, virtual
+  for (int i = 0; i < 5; i++) {
+    double d = dos[i];
+    double s[3];
+    double y[3];
+    double s2[3];
+    pil_lens_principal_slopes(f, d, h, s);
+    for (int k = 0; k < 3; k++) {
+      y[k] = h + s[k] * d; // Height at lens
+      s2[k] = pil_lens_ray_slope(f, y[k], s[k]);
+    }
+
+    // Intersection of rays 0 and 2 after lens (lines y = y_k + s2_k x)
+    double xi = (y[2] - y[0]) / (s2[0] - s2[2]);
+    double yi = y[0] + s2[0] * xi;
+    check("rays 0 and 2 meet at x = d_i", xi, pil_lens_image(f, d), 1e-9);
+    check("ray 1 (through the centre) passes through the same point",
+          y[1] + s2[1] * xi, yi, 1e-9);
+    check("image height = m h", yi, pil_lens_magnification(f, d) * h, 1e-9);
+  }
+
+  double s[3];
+  pil_lens_principal_slopes(f, 2.0, 0.5, s);
+  check("ray 0 is parallel to the axis", s[0], 0.0, 0);
+  check("parallel ray goes through the far focus",
+        pil_lens_ray_slope(f, 0.5, 0.0), -0.5, 1e-12);
+  check("central ray is undeflected", pil_lens_ray_slope(f, 0.0, 0.3), 0.3,
+        1e-12);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2276,6 +2312,7 @@ int main(void) {
   test_rutherford();
   test_electrostatic();
   test_optics();
+  test_lens_rays();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

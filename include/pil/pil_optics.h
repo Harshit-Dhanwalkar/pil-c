@@ -45,6 +45,16 @@ double pil_prism_min_deviation(double apex, double n);
 double pil_lens_image(double f, double dobj);
 double pil_lens_magnification(double f, double dobj);
 
+/* Ray through a thin lens at height y above axis with slope dy/dx = s:
+ * slope after lens is s - y / f (a ray through centre is undeflected, a
+ * ray parallel to axis goes through focus) */
+double pil_lens_ray_slope(double f, double y, double s);
+
+/* 3 principal rays from an object tip at (-dobj, h): returns slope before lens
+ * of (0) ray parallel to axis, (1) ray through lens centre, (2) ray aimed
+ * through (or, for dobj < f, away from) front focus; all start at tip */
+void pil_lens_principal_slopes(double f, double dobj, double h, double s[3]);
+
 #ifdef __cplusplus
 }
 #endif

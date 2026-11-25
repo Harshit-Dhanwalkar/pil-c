@@ -95,3 +95,11 @@ double pil_lens_image(double f, double dobj) {
 double pil_lens_magnification(double f, double dobj) {
   return -pil_lens_image(f, dobj) / dobj;
 }
+
+double pil_lens_ray_slope(double f, double y, double s) { return s - y / f; }
+
+void pil_lens_principal_slopes(double f, double dobj, double h, double s[3]) {
+  s[0] = 0.0;
+  s[1] = -h / dobj;
+  s[2] = h / (f - dobj);
+}
