@@ -71,6 +71,7 @@ snell|4|Snell's law, total internal reflection and Fresnel reflectance
 lens|3|Thin lens ray diagram: real, inverted image becomes virtual as the object nears the focus
 prism|3.4|Prism dispersion: white light fans into a spectrum, deviation vs incidence angle
 timer555|0.02|555 astable oscillator: capacitor ramps between 1/3 and 2/3 Vcc, square output
+equipotential|3|Dipole equipotentials cross the field lines at right angles; V along a probe path
 "
 
 CARDS=

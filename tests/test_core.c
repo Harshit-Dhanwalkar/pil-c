@@ -2343,6 +2343,68 @@ static void test_timer555(void) {
         pil_555_duty(r1, r2), 1e-12);
 }
 
+static void test_equipotential(void) {
+  puts("equipotentials: stay on V = const, close around one charge, V = 0 "
+       "plane of a dipole");
+  pil_charges c;
+  c.n = 1;
+  c.q[0] = 2.0;
+  c.x[0][0] = 0.3;
+  c.x[0][1] = -0.2;
+  static double px[8004], py[8004];
+  int n = pil_es_equipotential(&c, 1.3, -0.2, 0.05, 4000, 10, 10, 0.05, px, py);
+  double rmax = 0;
+  double rmin = 1e9;
+  for (int i = 0; i < n; i++) {
+    double r = hypot(px[i] - 0.3, py[i] + 0.2);
+    if (r > rmax) {
+      rmax = r;
+    }
+    if (r < rmin) {
+      rmin = r;
+    }
+  }
+
+  check("circle radius q/V", 0.5 * (rmax + rmin), 1.0, 1e-4);
+  check("circle is round", rmax - rmin, 0.0, 1e-4);
+  check("loop closes on its start", hypot(px[n - 1] - px[0], py[n - 1] - py[0]),
+        0.0, 1e-9);
+  c.n = 2;
+  c.q[0] = 1.0;
+  c.q[1] = -1.0;
+  c.x[0][0] = -1.2;
+  c.x[0][1] = 0.0;
+  c.x[1][0] = 1.2;
+  c.x[1][1] = 0.0;
+  n = pil_es_equipotential(&c, 0.0, 0.0, 0.05, 400, 5, 3, 0.05, px, py);
+  double ylo = 1e9;
+  double yhi = -1e9;
+  for (int i = 0; i < n; i++) {
+    if (py[i] < ylo) {
+      ylo = py[i];
+    }
+    if (py[i] > yhi) {
+      yhi = py[i];
+    }
+  }
+  check("x = 0 line spans the box both ways",
+        ylo < -2.9 && yhi > 2.9 ? 1.0 : 0.0, 1.0, 0.0);
+  double worst = 0;
+  double vv = 0;
+  for (int i = 0; i < n; i++) {
+    if (fabs(px[i]) > worst) {
+      worst = fabs(px[i]);
+    }
+    double v = fabs(pil_es_potential(&c, px[i], py[i]));
+    if (v > vv) {
+      vv = v;
+    }
+  }
+
+  check("V = 0 curve is the line x = 0", worst, 0.0, 1e-9);
+  check("potential stays 0 along it", vv, 0.0, 1e-9);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2398,6 +2460,7 @@ int main(void) {
   test_lens_rays();
   test_prism_glass();
   test_timer555();
+  test_equipotential();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

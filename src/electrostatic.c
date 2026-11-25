@@ -5,6 +5,8 @@
 
 #include "pil/pil_electrostatic.h"
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 void pil_es_field(const pil_charges *c, double x, double y, double *ex,
                   double *ey) {
@@ -71,7 +73,7 @@ int pil_es_field_line(const pil_charges *c, double x0, double y0, int dir,
     int stop = 0;
     for (int k = 0; k < c->n; k++) {
       if (k == skip && i < 30) {
-        continue; // Just left the emitting charge
+        continue; // Just left emitting charge
       }
       if (hypot(x - c->x[k][0], y - c->x[k][1]) < rcut) {
         stop = 1;
@@ -84,6 +86,96 @@ int pil_es_field_line(const pil_charges *c, double x0, double y0, int dir,
   }
 
   return n;
+}
+
+/* One direction (sgn = +1 / -1) along tangent; returns 1 in *closed if curve
+ * came back to its start */
+static int equi_dir(const pil_charges *c, double x0, double y0, double ds,
+                    int nmax, double xmax, double ymax, double rcut, int sgn,
+                    double *px, double *py, int *closed) {
+  double v0 = pil_es_potential(c, x0, y0), x = x0, y = y0;
+  int n = 0;
+  px[n] = x;
+  py[n++] = y;
+  for (int i = 0; i < nmax; i++) {
+    double ex;
+    double ey;
+    pil_es_field(c, x, y, &ex, &ey);
+    double em = hypot(ex, ey);
+    if (em < 1e-12) {
+      break;
+    }
+    double mx = x - sgn * 0.5 * ds * ey / em;
+    double my = y + sgn * 0.5 * ds * ex / em;
+    pil_es_field(c, mx, my, &ex, &ey);
+    em = hypot(ex, ey);
+    if (em < 1e-12) {
+      break;
+    }
+    x -= sgn * ds * ey / em;
+    y += sgn * ds * ex / em;
+    for (int k = 0; k < 2; k++) { // Newton: dx = (V - V0) E / |E|^2
+      pil_es_field(c, x, y, &ex, &ey);
+      double e2 = ex * ex + ey * ey;
+      double dv = pil_es_potential(c, x, y) - v0;
+      if (e2 < 1e-24) {
+        break;
+      }
+      x += dv * ex / e2;
+      y += dv * ey / e2;
+    }
+
+    if (fabs(x) > xmax || fabs(y) > ymax) {
+      break;
+    }
+    int stop = 0;
+    for (int k = 0; k < c->n; k++)
+      if (hypot(x - c->x[k][0], y - c->x[k][1]) < rcut) {
+        stop = 1;
+      }
+    if (stop) {
+      break;
+    }
+    if (i > 10 && hypot(x - x0, y - y0) < ds) {
+      px[n] = x0;
+      py[n++] = y0;
+      *closed = 1;
+      break;
+    }
+
+    px[n] = x;
+    py[n++] = y;
+  }
+
+  return n;
+}
+
+int pil_es_equipotential(const pil_charges *c, double x0, double y0, double ds,
+                         int nmax, double xmax, double ymax, double rcut,
+                         double *px, double *py) {
+  int closed = 0;
+  int nf = equi_dir(c, x0, y0, ds, nmax, xmax, ymax, rcut, 1, px, py, &closed);
+  if (closed) {
+    return nf;
+  }
+  double *bx = malloc(2 * (size_t)(nmax + 2) * sizeof *bx);
+  double *by = bx + nmax + 2;
+  if (!bx) {
+    return nf;
+  }
+  int unused = 0,
+      nb = equi_dir(c, x0, y0, ds, nmax, xmax, ymax, rcut, -1, bx, by, &unused);
+  /* Backward part reversed (without shared start point), then forward */
+  memmove(px + (nb - 1), px, (size_t)nf * sizeof *px);
+  memmove(py + (nb - 1), py, (size_t)nf * sizeof *py);
+  for (int i = 1; i < nb; i++) {
+    px[nb - 1 - i] = bx[i];
+    py[nb - 1 - i] = by[i];
+  }
+
+  free(bx);
+
+  return nf + nb - 1;
 }
 
 double pil_es_flux_sphere(const pil_charges *c, double cx, double R,

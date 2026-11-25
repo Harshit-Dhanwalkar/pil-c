@@ -73,7 +73,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/timer555   ./build/transformer ./build/zener
 ## Electrodynamics / Electostatics
 ./build/bottle     ./build/emwave     ./build/faraday    ./build/gauss
-./build/helmholtz
+./build/helmholtz  ./build/equipotential
 ## Atomic Structure
 ./build/rutherford
 # Optics

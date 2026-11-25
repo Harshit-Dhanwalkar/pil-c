@@ -41,6 +41,18 @@ int pil_es_field_line(const pil_charges *c, double x0, double y0, int dir,
                       int skip, double ds, int nmax, double xmax, double ymax,
                       double rcut, double *px, double *py);
 
+/* Equipotential curve through (x0, y0): steps of length ds along tangent
+ * (perpendicular to E) with a Newton correction back onto V = V(x0, y0)
+ * Stops when it leaves |x| < xmax, |y| < ymax, gets within rcut of a charge,
+ * closes on its start (start point is then repeated as last point) or after
+ * nmax steps
+ * An open curve is followed in both directions from start (points ordered along
+ * it)
+ * px/py need 2 nmax + 2 points; returns number of points */
+int pil_es_equipotential(const pil_charges *c, double x0, double y0, double ds,
+                         int nmax, double xmax, double ymax, double rcut,
+                         double *px, double *py);
+
 /* Flux of E through a sphere of radius R centred at (cx, 0, 0), for charges
  * lying on x axis (axially symmetric): 2 pi R^2 int E . n sin(theta) dtheta
  * with n_theta midpoint samples. Equals 4 pi times charge inside */
