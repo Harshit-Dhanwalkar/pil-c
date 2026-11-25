@@ -55,6 +55,24 @@ double pil_lens_ray_slope(double f, double y, double s);
  * through (or, for dobj < f, away from) front focus; all start at tip */
 void pil_lens_principal_slopes(double f, double dobj, double h, double s[3]);
 
+/* Cauchy dispersion n(lambda) = a + b / lambda^2 (lambda in micrometres) and an
+ * approximate display colour (rgb in 0..1) of a wavelength in nanometres
+ * (380..780) */
+double pil_cauchy_index(double a, double b, double lambda_um);
+void pil_wavelength_rgb(double lambda_nm, double rgb[3]);
+
+/* Trace a ray through a convex glass polygon of index n in air
+ * Polygon has nv vertices v[i] in counter-clockwise order
+ * Ray starts at `start` (outside) moving along `dir`
+ * At every boundary ray refracts out, or reflects totally if it cannot leave
+ * Polyline (start, boundary hits, ...) goes to pts[0..max_pts-1] with last
+ * point `tail` units beyond last exit along final direction; returns number of
+ * points (0 if ray misses glass) and final direction in *out_dir (may be NULL)
+ */
+int pil_glass_trace(const double (*v)[2], int nv, double n,
+                    const double start[2], const double dir[2], double tail,
+                    double (*pts)[2], int max_pts, double out_dir[2]);
+
 #ifdef __cplusplus
 }
 #endif

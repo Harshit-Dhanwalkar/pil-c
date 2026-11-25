@@ -75,7 +75,7 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ## Atomic Structure
 ./build/rutherford
 # Optics
-./build/lens       ./build/snell
+./build/lens       ./build/prism      ./build/snell
 
 make gallery
 ```

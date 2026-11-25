@@ -2260,6 +2260,38 @@ static void test_lens_rays(void) {
         1e-12);
 }
 
+static void test_prism_glass(void) {
+  puts("prism: glass ray trace matches the closed-form deviation");
+  static const double tri[3][2] = {{-1.5, 0.0}, {1.5, 0.0}, {0.0, 2.598076}};
+  double apex = M_PI / 3.0;
+  double n_v = pil_cauchy_index(1.60, 0.010, 0.4),
+         n_r = pil_cauchy_index(1.60, 0.010, 0.7);
+  check("Cauchy n(400 nm)", n_v, 1.6625, 1e-9);
+  check("violet bends more than red", n_v > n_r ? 1.0 : 0.0, 1.0, 0.0);
+  for (int k = 0; k < 6; k++) {
+    double ti = (40.0 + 7.0 * k) * M_PI / 180.0;
+    double n = k % 2 ? n_v : n_r;
+    double ang = -M_PI / 6.0 + ti;
+    double d[2] = {cos(ang), sin(ang)}, out[2];
+    double pts[8][2];
+    double pe[2] = {-0.75, 1.299038};
+    double st[2] = {pe[0] - 4 * d[0], pe[1] - 4 * d[1]};
+    int np = pil_glass_trace(tri, 3, n, st, d, 5.0, pts, 8, out);
+    check("trace has 4 points", np, 4, 0.0);
+    if (np == 4) {
+      double dev = acos(d[0] * out[0] + d[1] * out[1]);
+      check("deviation = closed form", dev, pil_prism_deviation(apex, n, ti),
+            1e-5);
+    }
+  }
+  double r0[3];
+  double r1[3];
+  pil_wavelength_rgb(400.0, r0);
+  pil_wavelength_rgb(700.0, r1);
+  check("violet is blue-dominant", r0[2] > r0[0] ? 1.0 : 0.0, 1.0, 0.0);
+  check("red is red only", r1[0] > r1[1] && r1[2] == 0.0 ? 1.0 : 0.0, 1.0, 0.0);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2313,6 +2345,7 @@ int main(void) {
   test_electrostatic();
   test_optics();
   test_lens_rays();
+  test_prism_glass();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

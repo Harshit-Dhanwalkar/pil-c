@@ -103,3 +103,132 @@ void pil_lens_principal_slopes(double f, double dobj, double h, double s[3]) {
   s[1] = -h / dobj;
   s[2] = h / (f - dobj);
 }
+
+double pil_cauchy_index(double a, double b, double lambda_um) {
+  return a + b / (lambda_um * lambda_um);
+}
+
+void pil_wavelength_rgb(double l, double rgb[3]) {
+  double r = 0.0, g = 0.0, b = 0.0;
+  if (l >= 380 && l < 440) {
+    r = (440 - l) / 60.0;
+    b = 1.0;
+  } else if (l < 490) {
+    g = (l - 440) / 50.0;
+    b = 1.0;
+  } else if (l < 510) {
+    g = 1.0;
+    b = (510 - l) / 20.0;
+  } else if (l < 580) {
+    r = (l - 510) / 70.0;
+    g = 1.0;
+  } else if (l < 645) {
+    r = 1.0;
+    g = (645 - l) / 65.0;
+  } else if (l <= 780) {
+    r = 1.0;
+  }
+  double f = l < 420 ? 0.3 + 0.7 * (l - 380) / 40.0
+                     : (l > 700 ? 0.3 + 0.7 * (780 - l) / 80.0 : 1.0);
+  if (f < 0.0) {
+    f = 0.0;
+  }
+  rgb[0] = r * f;
+  rgb[1] = g * f;
+  rgb[2] = b * f;
+}
+
+/* intersection of the ray p + t d (t > eps) with edge a-b; returns t or -1 */
+static double ray_edge(const double p[2], const double d[2], const double a[2],
+                       const double b[2]) {
+  double ex = b[0] - a[0];
+  double ey = b[1] - a[1];
+  double den = d[0] * ey - d[1] * ex;
+  if (fabs(den) < 1e-14) {
+    return -1.0;
+  }
+  double qx = a[0] - p[0];
+  double qy = a[1] - p[1];
+  double t = (qx * ey - qy * ex) / den;
+  double u = (qx * d[1] - qy * d[0]) / den;
+  if (t < 1e-9 || u < -1e-9 || u > 1.0 + 1e-9) {
+    return -1.0;
+  }
+
+  return t;
+}
+
+int pil_glass_trace(const double (*v)[2], int nv, double n,
+                    const double start[2], const double dir[2], double tail,
+                    double (*pts)[2], int max_pts, double out_dir[2]) {
+  double p[2] = {start[0], start[1]};
+  double d[2] = {dir[0], dir[1]};
+  double dl = hypot(d[0], d[1]);
+  d[0] /= dl;
+  d[1] /= dl;
+  int np = 0;
+  int inside = 0;
+  int last_edge = -1;
+  pts[np][0] = p[0];
+  pts[np++][1] = p[1];
+  for (int it = 0; it < 8 && np < max_pts - 1; it++) {
+    double best = 1e30;
+    int be = -1;
+    for (int e = 0; e < nv; e++) {
+      if (e == last_edge) {
+        continue;
+      }
+      double t = ray_edge(p, d, v[e], v[(e + 1) % nv]);
+      if (t > 0 && t < best) {
+        best = t;
+        be = e;
+      }
+    }
+
+    if (be < 0) {
+      break;
+    }
+    p[0] += best * d[0];
+    p[1] += best * d[1];
+    pts[np][0] = p[0];
+    pts[np++][1] = p[1];
+    double ex = v[(be + 1) % nv][0] - v[be][0];
+    double ey = v[(be + 1) % nv][1] - v[be][1];
+    double el = hypot(ex, ey);
+    double out_n[2] = {ey / el, -ex / el}; // Outward for CCW
+    double nrm[2];
+    double o[2];
+    if (!inside) { // Arriving from outside: normal points back out
+      nrm[0] = out_n[0];
+      nrm[1] = out_n[1];
+      pil_refract(d, nrm, 1.0, n, o);
+      inside = 1;
+    } else {
+      nrm[0] = -out_n[0];
+      nrm[1] = -out_n[1];
+      inside = pil_refract(d, nrm, n, 1.0, o) ? 0 : 1;
+    }
+
+    d[0] = o[0];
+    d[1] = o[1];
+    last_edge = be;
+    if (!inside) {
+      break;}
+  }
+
+  if (!inside && np > 1) {
+    pts[np][0] = p[0] + tail * d[0];
+    pts[np++][1] = p[1] + tail * d[1];
+  } else if (np > 1) {
+    np = 0; // Trapped (should not happen for convex glass in a few bounces)
+  } else {
+    np = 0;
+  }
+
+  if (out_dir && np) {
+    out_dir[0] = d[0];
+    out_dir[1] = d[1];
+  }
+
+  return np;
+}

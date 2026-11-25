@@ -6,8 +6,8 @@
  * rolls against spring k_1 and dashpot c_1; a block 3 slides in a slot of
  * disc against spring k_2; block 6 rests on bar with friction
  * Under bar a double pendulum (rods 7 and 8, ball 9) hangs from S_1 Five
- * coordinates: phi, disc position, slider position, theta_7, theta_8 Everything
- * is public-API
+ * coordinates: phi, disc position, slider position, theta_7, theta_8
+ * Everything is public-API
  */
 
 #include "example_main.h"
@@ -15,9 +15,9 @@
 
 typedef struct {
   pil_body *bar;
-  pil_vec2 pin; // left pin of bar, in bar-frame offset from COM
+  pil_vec2 pin; // Left pin of bar, in bar-frame offset from COM
   pil_vec2 pivot;
-  double l, kphi;
+  double l; double kphi;
 } lk_ref;
 
 typedef struct {
@@ -26,10 +26,10 @@ typedef struct {
   pil_body *blk;
   pil_body *r7;
   pil_body *r8;
-  pil_vec2 pin; // left pin of bar relative to its COM
+  pil_vec2 pin; // Left pin of bar relative to its COM
   pil_vec2 pivot;
-  pil_vec2 slot; // slot direction in disc frame
-  double wall;   // wall x offset on bar
+  pil_vec2 slot; // Slot direction in disc frame
+  double wall;   // Wall x offset on bar
 } lk_sig;
 
 static pil_vec2 left_pin(const lk_sig *s) {
@@ -75,8 +75,8 @@ static double sig_th8(const pil_world *w, void *user) {
 }
 
 // Torsion spring k_phi on left rod: it acts on rod angle, and rods are
-// massless, so it is applied as equivalent force on bar's pin (virtual work Q
-// dphi = F . l t dphi)
+// massless, so it is applied as equivalent force on bar's pin (virtual
+// work Q dphi = F . l t dphi)
 static void torsion_force(pil_world *w, double t, void *user) {
   const lk_ref *r = user;
   pil_vec2 p = pil_body_point(r->bar, r->pin);
@@ -90,8 +90,8 @@ static void torsion_force(pil_world *w, double t, void *user) {
 
 typedef struct {
   const lk_sig *s;
-  double kphi_r; // radius of spiral, in px
-  double a, l;
+  double kphi_r; // Radius of spiral, in px
+  double a; double l;
 } lk_draw;
 
 static void pin_symbol(cairo_t *cr, const pil_view *v, pil_vec2 p,
@@ -171,12 +171,12 @@ int main(int argc, char **argv) {
   const double k1 = 700.0;
   const double k2 = 1600.0;
   const double mu2 = 1.16;
-  const double hb = 0.05; // bar thickness
+  const double hb = 0.05; // Bar thickness
   const double wall = 0.03;
   const double phi0 = -0.3;
   const double th7 = -0.9;
   const double th8 = -1.5;
-  const double a3 = -0.3; // slot direction in disc frame
+  const double a3 = -0.3; // Slot direction in disc frame
 
   static lk_ref ref;
   static lk_sig sig;
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
   pil_world_set_gravity(w, 0, -g);
 
   pil_vec2 P1 = {0, 0};
-  pil_vec2 Lp = {l * sin(phi0), -l * cos(phi0)}; // left pin
+  pil_vec2 Lp = {l * sin(phi0), -l * cos(phi0)}; // Left pin
   pil_add_ground(w, (pil_vec2){a + 0.45, 0.0}, (pil_vec2){-0.45, 0.0});
 
   // Bar with wall that carries spring and dashpot, one polygon
