@@ -66,12 +66,14 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ./build/pulleys    ./build/race       ./build/resonance  ./build/ring
 ./build/swing      ./build/tower      ./build/top        ./build/shaker
 ./build/waves      ./build/spherical
-## Electrodynamics / Electostatics / Circuits
-./build/bjt        ./build/bode       ./build/bottle     ./build/belts
-./build/bridge     ./build/cmos       ./build/cyclotron  ./build/emwave
-./build/exb        ./build/faraday    ./build/gauss      ./build/helmholtz
-./build/lc         ./build/rc         ./build/opamp      ./build/rectifier
-./build/rlc        ./build/transformer ./build/zener
+## Circuits / Electronics
+./build/bjt        ./build/bode       ./build/belts      ./build/bridge
+./build/cmos       ./build/cyclotron  ./build/exb        ./build/lc
+./build/rc         ./build/opamp      ./build/rectifier  ./build/rlc
+./build/timer555   ./build/transformer ./build/zener
+## Electrodynamics / Electostatics
+./build/bottle     ./build/emwave     ./build/faraday    ./build/gauss
+./build/helmholtz
 ## Atomic Structure
 ./build/rutherford
 # Optics

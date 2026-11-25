@@ -16,6 +16,7 @@
 #include <pil/pil_rotframe.h>
 #include <pil/pil_scatter.h>
 #include <pil/pil_spherical.h>
+#include <pil/pil_timer555.h>
 #include <pil/pil_wave.h>
 #include <stdio.h>
 
@@ -2292,6 +2293,56 @@ static void test_prism_glass(void) {
   check("red is red only", r1[0] > r1[1] && r1[2] == 0.0 ? 1.0 : 0.0, 1.0, 0.0);
 }
 
+static void test_timer555(void) {
+  puts("555 astable: simulated frequency and duty match the formulas");
+  double r1 = 1000.0;
+  double r2 = 2200.0;
+  double c = 1e-6;
+  pil_555 t;
+  pil_555_init(&t, r1, r2, c, 9.0);
+  double h = 1e-5;
+  double tm = 0.0;
+  double rise = -1.0;
+  double first = -1.0;
+  double hi = 0.0;
+  double vmin = 9.0;
+  double vmax = 0.0;
+  int n = 0;
+  int prev = t.out;
+  while (tm < 0.1) {
+    pil_555_step(&t, h);
+    tm += h;
+    if (t.out) {
+      hi += h;
+    }
+    if (tm > 0.01) {
+      if (t.vc < vmin) {
+        vmin = t.vc;
+      }
+      if (t.vc > vmax) {
+        vmax = t.vc;
+      }
+    }
+    if (t.out && !prev) {
+      if (first < 0) {
+        first = tm;
+      }
+      rise = tm;
+      n++;
+    }
+    prev = t.out;
+  }
+
+  double f = (n - 1) / (rise - first);
+  check("frequency", f / pil_555_frequency(r1, r2, c), 1.0, 5e-3);
+  check("duty", hi / tm, pil_555_duty(r1, r2), 1e-2);
+  check("v_C stays between 1/3 and 2/3 Vcc (min)", vmin, 3.0, 1e-2);
+  check("v_C stays between 1/3 and 2/3 Vcc (max)", vmax, 6.0, 1e-2);
+  check("duty formula = ton / T",
+        pil_555_high_time(r1, r2, c) * pil_555_frequency(r1, r2, c),
+        pil_555_duty(r1, r2), 1e-12);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2346,6 +2397,7 @@ int main(void) {
   test_optics();
   test_lens_rays();
   test_prism_glass();
+  test_timer555();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;
