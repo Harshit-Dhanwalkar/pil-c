@@ -5,6 +5,7 @@
 #include <pil/pil_chaos.h>
 #include <pil/pil_circuit.h>
 #include <pil/pil_core.h>
+#include <pil/pil_drag.h>
 #include <pil/pil_electrostatic.h>
 #include <pil/pil_emwave.h>
 #include <pil/pil_kapitza.h>
@@ -2485,6 +2486,48 @@ static void test_kapitza(void) {
   }
 }
 
+static void test_drag(void) {
+  puts("projectile with quadratic drag: vacuum limit, terminal speed, best "
+       "angle");
+  pil_drag vac = {9.81, 0.0};
+  pil_drag air = {9.81, 0.08};
+  for (int k = 0; k < 3; k++) {
+    double th = (25.0 + 20.0 * k) * M_PI / 180.0;
+    check("k = 0 range = v^2 sin(2 theta) / g",
+          pil_drag_range(&vac, 0.0, 10.0, th), 100.0 * sin(2.0 * th) / 9.81,
+          1e-3);
+  }
+
+  double y[4] = {0.0, 0.0, 0.0, 0.0};
+  double t = 0.0; // Dropped from rest: approaches terminal speed
+  for (int i = 0; i < 4000; i++) {
+    pil_rk4_step(pil_drag_deriv, 4, t, y, 0.005, &air);
+    t += 0.005;
+  }
+  check("fall speed -> sqrt(g / k)", -y[3], pil_drag_terminal(&air), 1e-3);
+  double best = 0.0;
+  double rbest = 0.0;
+  for (double a = 20.0; a < 70.0; a += 0.5) {
+    double r = pil_drag_range(&air, 0.0, 10.0, a * M_PI / 180.0);
+    if (r > rbest) {
+      rbest = r;
+      best = a;
+    }
+  }
+
+  check("best angle with drag < 45 deg", best < 43.0 && best > 30.0 ? 1.0 : 0.0,
+        1.0, 0.0);
+  check("drag shortens the range",
+        rbest < pil_drag_range(&vac, 0.0, 10.0, M_PI / 4.0) ? 1.0 : 0.0, 1.0,
+        0.0);
+  double tf;
+  static double pts[4000][2];
+  int n = pil_drag_trace(&vac, 0.0, 10.0, M_PI / 4.0, 0.005, pts, 4000, &tf);
+  check("flight time 2 v sin(theta) / g", tf,
+        2.0 * 10.0 * sin(M_PI / 4.0) / 9.81, 1e-3);
+  check("trace ends on the ground", pts[n - 1][1], 0.0, 1e-12);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2543,6 +2586,7 @@ int main(void) {
   test_equipotential();
   test_solenoid();
   test_kapitza();
+  test_drag();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

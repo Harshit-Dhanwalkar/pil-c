@@ -59,13 +59,13 @@ Text uses _Latin Modern_ (Roman + Math) if installed, as it is with $\TeX$ Live.
 ## Classical Mechanics
 ./build/atwood     ./build/blocks     ./build/bowl       ./build/crank
 ./build/collision  ./build/cycloid    ./build/doppler    ./build/doublependulum
-./build/figure8    ./build/foucault   ./build/frame      ./build/freebody
-./build/hohmann    ./build/hoop       ./build/impact     ./build/incline
-./build/kepler     ./build/linkage    ./build/loop       ./build/modes
-./build/motor      ./build/phase      ./build/poincare   ./build/projectile
-./build/pulleys    ./build/race       ./build/resonance  ./build/ring
-./build/swing      ./build/tower      ./build/top        ./build/shaker
-./build/waves      ./build/spherical
+./build/drag       ./build/figure8    ./build/foucault   ./build/frame
+./build/freebody   ./build/hohmann    ./build/hoop       ./build/impact
+./build/incline    ./build/kapitza    ./build/kepler     ./build/linkage
+./build/loop       ./build/modes      ./build/motor      ./build/phase
+./build/poincare   ./build/projectile ./build/pulleys    ./build/race
+./build/resonance  ./build/ring       ./build/swing      ./build/tower
+./build/top        ./build/shaker     ./build/waves      ./build/spherical
 ## Circuits / Electronics
 ./build/bjt        ./build/bode       ./build/belts      ./build/bridge
 ./build/cmos       ./build/cyclotron  ./build/exb        ./build/lc

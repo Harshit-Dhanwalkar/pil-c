@@ -74,6 +74,7 @@ timer555|0.02|555 astable oscillator: capacitor ramps between 1/3 and 2/3 Vcc, s
 equipotential|3|Dipole equipotentials cross the field lines at right angles; V along a probe path
 solenoid|8|Finite solenoid lengthens: field inside becomes uniform, outside fades
 kapitza|1.6|Kapitza pendulum: a vibrating pivot holds the inverted pendulum up
+drag|5|Projectile with quadratic air drag: shorter range, best angle below 45 degrees
 "
 
 CARDS=
