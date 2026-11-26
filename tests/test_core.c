@@ -7,6 +7,7 @@
 #include <pil/pil_core.h>
 #include <pil/pil_electrostatic.h>
 #include <pil/pil_emwave.h>
+#include <pil/pil_kapitza.h>
 #include <pil/pil_lagrange.h>
 #include <pil/pil_nbody.h>
 #include <pil/pil_ode.h>
@@ -2431,6 +2432,59 @@ static void test_solenoid(void) {
         6.0 / sqrt(36.0 + 4.0), 1e-12);
 }
 
+static void test_kapitza(void) {
+  puts("Kapitza pendulum: critical amplitude, slow frequency, stable vs "
+       "falling");
+  double g = 9.81;
+  double l = 1.0;
+  double w = 60.0;
+  double ac = pil_kapitza_critical_amp(g, l, w);
+  check("critical amplitude sqrt(2 g l) / w", ac, sqrt(2.0 * g * l) / w, 1e-12);
+  double Tf = 2.0 * M_PI / w;
+  for (int c = 0; c < 2; c++) {
+    pil_kapitza p = {g, l, c == 0 ? 1.6 * ac : 0.6 * ac, w, 0.0};
+    double y[2] = {0.3, 0.0};
+    double t = 0.0;
+    double h = Tf / 200.0;
+    double maxth = 0.0;
+    double prev = y[0];
+    double tc[8];
+    int nc = 0;
+    for (int k = 0; k < 200 * 60 && nc < 8; k++) { // 60 vibration periods
+      pil_rk4_step(pil_kapitza_deriv, 2, t, y, h, &p);
+      t += h;
+      if (fabs(y[0]) > maxth) {
+        maxth = fabs(y[0]);
+      }
+      if (k % 200 == 199) { // Stroboscopic sample: slow motion
+        if (prev > 0.0 && y[0] <= 0.0 && nc < 8) {
+          tc[nc++] = t - 200.0 * h * y[0] / (y[0] - prev);
+        }
+        prev = y[0];
+      }
+    }
+
+    if (c == 0) {
+      check("stable: stays near the vertical", maxth < 0.5 ? 1.0 : 0.0, 1.0,
+            0.0);
+      check("effective potential has a minimum at 0",
+            pil_kapitza_veff(&p, 0.1) > pil_kapitza_veff(&p, 0.0) ? 1.0 : 0.0,
+            1.0, 0.0);
+      if (nc >= 2) {
+        double T = (tc[nc - 1] - tc[0]) / (nc - 1);
+        check("slow period vs 2 pi / sqrt(a^2 w^2 / 2 l^2 - g / l)",
+              T / (2.0 * M_PI / pil_kapitza_slow_freq(&p)), 1.0, 0.1);
+      } else {
+        check("slow oscillation observed", 0.0, 1.0, 0.0);
+      }
+    } else {
+      check("below critical: falls over", maxth > 2.0 ? 1.0 : 0.0, 1.0, 0.0);
+      check("no slow frequency below critical", pil_kapitza_slow_freq(&p), 0.0,
+            0.0);
+    }
+  }
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2488,6 +2542,7 @@ int main(void) {
   test_timer555();
   test_equipotential();
   test_solenoid();
+  test_kapitza();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

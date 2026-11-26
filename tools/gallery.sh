@@ -73,6 +73,7 @@ prism|3.4|Prism dispersion: white light fans into a spectrum, deviation vs incid
 timer555|0.02|555 astable oscillator: capacitor ramps between 1/3 and 2/3 Vcc, square output
 equipotential|3|Dipole equipotentials cross the field lines at right angles; V along a probe path
 solenoid|8|Finite solenoid lengthens: field inside becomes uniform, outside fades
+kapitza|1.6|Kapitza pendulum: a vibrating pivot holds the inverted pendulum up
 "
 
 CARDS=
