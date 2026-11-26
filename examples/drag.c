@@ -19,7 +19,7 @@
 #define MAXP 4000
 
 static const pil_drag AIR = {9.81, 0.08};
-static const VAC = {9.81, 0.0};
+static const pil_drag VAC = {9.81, 0.0};
 
 typedef struct {
   const pil_world *w;
