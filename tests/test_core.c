@@ -15,6 +15,7 @@
 #include <pil/pil_optics.h>
 #include <pil/pil_orbit.h>
 #include <pil/pil_particle.h>
+#include <pil/pil_rocket.h>
 #include <pil/pil_rotframe.h>
 #include <pil/pil_scatter.h>
 #include <pil/pil_solenoid.h>
@@ -2528,6 +2529,57 @@ static void test_drag(void) {
   check("trace ends on the ground", pts[n - 1][1], 0.0, 1e-12);
 }
 
+static void test_rocket(void) {
+  puts("rocket: Tsiolkovsky, gravity loss, staging");
+  pil_rocket free1 = {0.0, 50.0, 1, {{150.0, 800.0, 10.0, 2500.0}}};
+  pil_rocket one = {9.81, 50.0, 1, {{150.0, 800.0, 10.0, 2500.0}}};
+  pil_rocket two = {
+      9.81,
+      50.0,
+      2,
+      {{100.0, 600.0, 10.0, 2500.0}, {50.0, 200.0, 10.0, 2500.0}}};
+  pil_rocket two0 = two;
+  two0.g = 0.0;
+  pil_rocket_state s;
+  pil_rocket_init(&s);
+  for (int i = 0; i < 800; i++) {
+    pil_rocket_step(&free1, &s, 0.1);
+  }
+  check("g = 0 burnout speed = ve ln(m0/m1)", s.v,
+        pil_rocket_dv(2500.0, 1000.0, 200.0), 1e-6);
+  check("burnout time = fuel / mdot", s.t, 80.0, 1e-9);
+  check("stage index after burnout", s.stage, 1, 0.0);
+  pil_rocket_init(&s);
+  for (int i = 0; i < 800; i++) {
+    pil_rocket_step(&one, &s, 0.1);
+  }
+  check("gravity loss: v = ve ln(m0/m1) - g t", s.v,
+        pil_rocket_dv(2500.0, 1000.0, 200.0) - 9.81 * 80.0, 1e-5);
+  pil_rocket_init(&s);
+  for (int i = 0; i < 800; i++) {
+    pil_rocket_step(&two0, &s, 0.1);
+  }
+  check("two stages, g = 0: sum of the two Tsiolkovsky gains", s.v,
+        pil_rocket_dv(2500.0, 1000.0, 400.0) +
+            pil_rocket_dv(2500.0, 300.0, 100.0),
+        1e-6);
+  check("staging beats one stage",
+        s.v > pil_rocket_dv(2500.0, 1000.0, 200.0) ? 1.0 : 0.0, 1.0, 0.0);
+  pil_rocket_init(&s);
+  for (int i = 0; i < 800; i++) {
+    pil_rocket_step(&two, &s, 0.1);
+  }
+  double hb = s.h;
+  double vb = s.v;
+  for (int i = 0; i < 1000; i++) {
+    pil_rocket_step(&two, &s, 0.1);
+  }
+  check("coasting: v = vb - g dt", s.v, vb - 9.81 * 100.0, 1e-6);
+  check("coasting: h = hb + vb dt - g dt^2/2", s.h,
+        hb + vb * 100.0 - 0.5 * 9.81 * 1e4, 1e-6);
+  check("mass after the last stage", pil_rocket_mass(&two, &s), 50.0, 1e-9);
+}
+
 int main(void) {
   test_spring();
   test_pendulum();
@@ -2587,6 +2639,7 @@ int main(void) {
   test_solenoid();
   test_kapitza();
   test_drag();
+  test_rocket();
   printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASSED", fails,
          fails == 1 ? "" : "s");
   return fails ? 1 : 0;

@@ -75,6 +75,7 @@ equipotential|3|Dipole equipotentials cross the field lines at right angles; V a
 solenoid|8|Finite solenoid lengthens: field inside becomes uniform, outside fades
 kapitza|1.6|Kapitza pendulum: a vibrating pivot holds the inverted pendulum up
 drag|5|Projectile with quadratic air drag: shorter range, best angle below 45 degrees
+rocket|70|Rocket equation: two stages beat one stage of the same mass
 "
 
 CARDS=
